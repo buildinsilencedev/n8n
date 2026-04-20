@@ -2980,6 +2980,8 @@ export interface IWorkflowExecutionDataProcess {
 		arguments: Record<string, unknown>;
 		sourceNodeName?: string;
 	};
+	/** W3C trace context extracted from inbound webhook headers. */
+	tracingContext?: { traceparent: string; tracestate?: string };
 }
 
 export interface ExecuteWorkflowOptions {
@@ -3091,6 +3093,13 @@ export interface IWorkflowExecuteAdditionalData {
 	 * dynamically. Reset to false by the execution engine before each node runs.
 	 */
 	currentNodeUsedDynamicCredentials?: boolean;
+	otel?: {
+		injectTraceHeaders: (
+			executionId: string,
+			nodeName: string | undefined,
+			headers: Record<string, string>,
+		) => void;
+	};
 }
 
 export type WorkflowActivateMode =
