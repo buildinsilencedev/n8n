@@ -59,11 +59,12 @@ beforeEach(async () => {
 	authMemberAgent = testServer.publicApiAgentFor(member);
 });
 
-const testWithAPIKey = (method: 'get' | 'post', url: string, apiKey: string | null) => async () => {
-	void authOwnerAgent.set({ 'X-N8N-API-KEY': apiKey });
-	const response = await authOwnerAgent[method](url);
-	expect(response.statusCode).toBe(401);
-};
+const testWithAPIKey =
+	(method: 'get' | 'post' | 'patch', url: string, apiKey: string | null) => async () => {
+		void authOwnerAgent.set({ 'X-N8N-API-KEY': apiKey });
+		const response = await authOwnerAgent[method](url);
+		expect(response.statusCode).toBe(401);
+	};
 
 describe('POST /projects/:projectId/folders', () => {
 	test(
@@ -216,5 +217,124 @@ describe('GET /projects/:projectId/folders', () => {
 		expect(response.statusCode).toBe(200);
 		expect(response.body.count).toBe(2);
 		expect(response.body.data).toHaveLength(2);
+	});
+});
+
+describe('GET /projects/:projectId/folders/:folderId', () => {
+	test('should return folder details with counts', async () => {
+		testServer.license.enable('feat:folders');
+
+		const folder = await createFolder(ownerPersonalProject, { name: 'Parent' });
+		await createFolder(ownerPersonalProject, { name: 'Child', parentFolder: folder });
+
+		const response = await authOwnerAgent.get(
+			`/projects/${ownerPersonalProject.id}/folders/${folder.id}`,
+		);
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toHaveProperty('id', folder.id);
+		expect(response.body).toHaveProperty('name', 'Parent');
+		expect(response.body).toHaveProperty('totalSubFolders');
+		expect(response.body).toHaveProperty('totalWorkflows');
+		expect(response.body.totalSubFolders).toBe(1);
+	});
+
+	test('should return 404 when folder does not exist', async () => {
+		testServer.license.enable('feat:folders');
+
+		const response = await authOwnerAgent.get(
+			`/projects/${ownerPersonalProject.id}/folders/non-existent-folder-id`,
+		);
+
+		expect(response.statusCode).toBe(404);
+	});
+
+	test('should return 404 when project does not exist', async () => {
+		testServer.license.enable('feat:folders');
+
+		const response = await authOwnerAgent.get(
+			'/projects/non-existent-project-id/folders/any-folder-id',
+		);
+
+		expect(response.statusCode).toBe(404);
+	});
+
+	test('should return 403 when feature is not licensed', async () => {
+		const response = await authOwnerAgent.get(
+			`/projects/${ownerPersonalProject.id}/folders/any-folder-id`,
+		);
+
+		expect(response.statusCode).toBe(403);
+	});
+});
+
+describe('PATCH /projects/:projectId/folders/:folderId', () => {
+	test('should update folder name', async () => {
+		testServer.license.enable('feat:folders');
+
+		const folder = await createFolder(ownerPersonalProject, { name: 'Original' });
+
+		const response = await authOwnerAgent
+			.patch(`/projects/${ownerPersonalProject.id}/folders/${folder.id}`)
+			.send({ name: 'Renamed' });
+
+		expect(response.statusCode).toBe(200);
+		expect(response.body).toHaveProperty('name', 'Renamed');
+	});
+
+	test('should update parent folder', async () => {
+		testServer.license.enable('feat:folders');
+
+		const parentFolder = await createFolder(ownerPersonalProject, { name: 'Parent' });
+		const childFolder = await createFolder(ownerPersonalProject, { name: 'Child' });
+
+		const response = await authOwnerAgent
+			.patch(`/projects/${ownerPersonalProject.id}/folders/${childFolder.id}`)
+			.send({ parentFolderId: parentFolder.id });
+
+		expect(response.statusCode).toBe(200);
+	});
+
+	test('should return 404 when folder does not exist', async () => {
+		testServer.license.enable('feat:folders');
+
+		const response = await authOwnerAgent
+			.patch(`/projects/${ownerPersonalProject.id}/folders/non-existent-folder-id`)
+			.send({ name: 'Renamed' });
+
+		expect(response.statusCode).toBe(404);
+	});
+
+	test('should return 404 when project does not exist', async () => {
+		testServer.license.enable('feat:folders');
+
+		const response = await authOwnerAgent
+			.patch('/projects/non-existent-project-id/folders/any-folder-id')
+			.send({ name: 'Renamed' });
+
+		expect(response.statusCode).toBe(404);
+	});
+
+	test('should return 403 when feature is not licensed', async () => {
+		const response = await authOwnerAgent
+			.patch(`/projects/${ownerPersonalProject.id}/folders/any-folder-id`)
+			.send({ name: 'Renamed' });
+
+		expect(response.statusCode).toBe(403);
+	});
+
+	test('should return 403 when user is not a member of the project', async () => {
+		testServer.license.enable('feat:folders');
+		testServer.license.setQuota('quota:maxTeamProjects', -1);
+		testServer.license.enable('feat:projectRole:admin');
+
+		const teamProject = await createTeamProject('No Access');
+		const folder = await createFolder(teamProject, { name: 'Team Folder' });
+
+		const response = await authMemberAgent
+			.patch(`/projects/${teamProject.id}/folders/${folder.id}`)
+			.send({ name: 'Renamed' });
+
+		expect(response.statusCode).toBe(403);
 	});
 });

@@ -4,7 +4,7 @@ import {
 	randomName,
 	uniqueId,
 } from '@n8n/backend-test-utils';
-import { CredentialsEntity, Project, User } from '@n8n/db';
+import { CredentialsEntity, Folder, Project, User } from '@n8n/db';
 import { randomInt } from 'n8n-workflow';
 
 export const mockCredential = (): CredentialsEntity =>
@@ -23,4 +23,11 @@ export const mockProject = (): Project =>
 		id: uniqueId(),
 		type: 'personal',
 		name: 'Nathan Fillion <nathan.fillion@n8n.io>',
+	});
+
+export const mockFolder = (): Folder =>
+	Object.assign(new Folder(), {
+		id: uniqueId(),
+		name: 'My Folder',
+		parentFolderId: null,
 	});

@@ -1,0 +1,9 @@
+type: object
+additionalProperties: false
+properties:
+  name:
+    type: string
+    example: Renamed Folder
+  parentFolderId:
+    type: string
+    example: abc123

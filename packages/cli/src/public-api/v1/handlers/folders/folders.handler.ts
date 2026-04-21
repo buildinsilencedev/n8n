@@ -1,4 +1,4 @@
-import { CreateFolderDto, ListFolderQueryDto } from '@n8n/api-types';
+import { CreateFolderDto, ListFolderQueryDto, UpdateFolderDto } from '@n8n/api-types';
 import type { AuthenticatedRequest } from '@n8n/db';
 import { Container } from '@n8n/di';
 import type { Response } from 'express';
@@ -54,6 +54,60 @@ export = {
 			);
 
 			return res.json({ count, data });
+		},
+	],
+	getFolder: [
+		isLicensed('feat:folders'),
+		apiKeyHasScopeWithGlobalScopeFallback({ scope: 'folder:read' }),
+		async (req: AuthenticatedRequest<{ projectId: string; folderId: string }>, res: Response) => {
+			const { projectId } = req.params;
+			await assertProjectScope(req.user, projectId, ['folder:read']);
+			const folderService = Container.get(FolderService);
+
+			try {
+				const folder = await folderService.findFolderInProjectOrFail(
+					req.params.folderId,
+					projectId,
+				);
+				const { totalSubFolders, totalWorkflows } = await folderService.getFolderAndWorkflowCount(
+					req.params.folderId,
+					projectId,
+				);
+
+				return res.json({ ...folder, totalSubFolders, totalWorkflows });
+			} catch (e) {
+				if (e instanceof FolderNotFoundError) throw new NotFoundError(e.message);
+				throw e;
+			}
+		},
+	],
+	updateFolder: [
+		isLicensed('feat:folders'),
+		apiKeyHasScopeWithGlobalScopeFallback({ scope: 'folder:update' }),
+		async (req: AuthenticatedRequest<{ projectId: string; folderId: string }>, res: Response) => {
+			const { projectId } = req.params;
+			await assertProjectScope(req.user, projectId, ['folder:update']);
+
+			const payload = UpdateFolderDto.safeParse(req.body);
+			if (payload.error) {
+				throw new BadRequestError(payload.error.errors[0].message);
+			}
+
+			try {
+				await Container.get(FolderService).updateFolder(
+					req.params.folderId,
+					projectId,
+					payload.data,
+				);
+				const updated = await Container.get(FolderService).findFolderInProjectOrFail(
+					req.params.folderId,
+					projectId,
+				);
+				return res.json(updated);
+			} catch (e) {
+				if (e instanceof FolderNotFoundError) throw new NotFoundError(e.message);
+				throw e;
+			}
 		},
 	],
 };
