@@ -1,10 +1,10 @@
 /**
  * SDK prompt sections for the workflow builder sub-agent.
  *
- * Adapted from ai-workflow-builder.ee/code-builder/prompts/index.ts — plain
- * strings without LangChain template escaping.
+ * Re-exports from the canonical source in @n8n/workflow-sdk/prompts.
  */
 
+<<<<<<< HEAD
 import { SDK_IMPORT_STATEMENT } from './extract-code';
 
 /**
@@ -562,3 +562,11 @@ export default workflow('ai-sentiment', 'AI Sentiment Analyzer')
   .to(aiAgent);
 \`\`\`
 </ai_agent_with_structured_output>`;
+=======
+export {
+	EXPRESSION_REFERENCE,
+	ADDITIONAL_FUNCTIONS,
+	WORKFLOW_RULES,
+	WORKFLOW_SDK_PATTERNS,
+} from '@n8n/workflow-sdk/prompts/sdk-reference';
+>>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5

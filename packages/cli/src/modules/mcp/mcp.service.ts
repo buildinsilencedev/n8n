@@ -52,7 +52,11 @@ import { createValidateWorkflowCodeTool } from './tools/workflow-builder/validat
 import { WorkflowBuilderToolsService } from './tools/workflow-builder/workflow-builder-tools.service';
 
 import { ActiveExecutions } from '@/active-executions';
+<<<<<<< HEAD
 import { N8N_VERSION } from '@/constants';
+=======
+import { CollaborationService } from '@/collaboration/collaboration.service';
+>>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 import { CredentialsService } from '@/credentials/credentials.service';
 import { ExecutionService } from '@/executions/execution.service';
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
@@ -126,6 +130,7 @@ export class McpService {
 		private readonly executionRepository: ExecutionRepository,
 		private readonly executionService: ExecutionService,
 		private readonly dataTableProxyService: DataTableProxyService,
+		private readonly collaborationService: CollaborationService,
 	) {}
 
 	async getServer(user: User) {
@@ -145,8 +150,177 @@ export class McpService {
 			},
 		);
 
+<<<<<<< HEAD
 		for (const tool of externalToolRegistry.tools) {
 			server.registerTool(tool.name, tool.config, tool.handler);
+=======
+		// Existing tools
+		const workflowSearchTool = createSearchWorkflowsTool(
+			user,
+			this.workflowService,
+			this.telemetry,
+		);
+		server.registerTool(
+			workflowSearchTool.name,
+			workflowSearchTool.config,
+			workflowSearchTool.handler,
+		);
+
+		const executeWorkflowTool = createExecuteWorkflowTool(
+			user,
+			this.workflowFinderService,
+			this.workflowRunner,
+			this.telemetry,
+			this,
+		);
+		server.registerTool(
+			executeWorkflowTool.name,
+			executeWorkflowTool.config,
+			executeWorkflowTool.handler,
+		);
+
+		const getExecutionTool = createGetExecutionTool(
+			user,
+			this.executionRepository,
+			this.workflowFinderService,
+			this.telemetry,
+		);
+		server.registerTool(getExecutionTool.name, getExecutionTool.config, getExecutionTool.handler);
+
+		const workflowDetailsTool = createWorkflowDetailsTool(
+			user,
+			this.urlService.getWebhookBaseUrl(),
+			this.workflowFinderService,
+			this.credentialsService,
+			{
+				webhook: this.globalConfig.endpoints.webhook,
+				webhookTest: this.globalConfig.endpoints.webhookTest,
+			},
+			this.telemetry,
+			this.roleService,
+			this.projectService,
+		);
+		server.registerTool(
+			workflowDetailsTool.name,
+			workflowDetailsTool.config,
+			workflowDetailsTool.handler,
+		);
+
+		const publishWorkflowTool = createPublishWorkflowTool(
+			user,
+			this.workflowFinderService,
+			this.workflowService,
+			this.telemetry,
+			this.collaborationService,
+		);
+		server.registerTool(
+			publishWorkflowTool.name,
+			publishWorkflowTool.config,
+			publishWorkflowTool.handler,
+		);
+
+		const unpublishWorkflowTool = createUnpublishWorkflowTool(
+			user,
+			this.workflowFinderService,
+			this.workflowService,
+			this.telemetry,
+			this.collaborationService,
+		);
+		server.registerTool(
+			unpublishWorkflowTool.name,
+			unpublishWorkflowTool.config,
+			unpublishWorkflowTool.handler,
+		);
+
+		const prepareTestPinDataTool = createPrepareTestPinDataTool(
+			user,
+			this.workflowFinderService,
+			this.executionService,
+			this.nodeTypes,
+			this.telemetry,
+			this.logger,
+		);
+		server.registerTool(
+			prepareTestPinDataTool.name,
+			prepareTestPinDataTool.config,
+			prepareTestPinDataTool.handler,
+		);
+
+		const testWorkflowTool = createTestWorkflowTool(
+			user,
+			this.workflowFinderService,
+			this.activeExecutions,
+			this.workflowRunner,
+			this.nodeTypes,
+			this.telemetry,
+			this,
+		);
+		server.registerTool(testWorkflowTool.name, testWorkflowTool.config, testWorkflowTool.handler);
+
+		// Data table tools
+		const dataTableOps = this.dataTableProxyService.makeDataTableOperationsForUser(user);
+
+		const searchDataTablesTool = createSearchDataTablesTool(user, dataTableOps, this.telemetry);
+		server.registerTool(
+			searchDataTablesTool.name,
+			searchDataTablesTool.config,
+			searchDataTablesTool.handler,
+		);
+
+		const createDataTableTool = createCreateDataTableTool(user, dataTableOps, this.telemetry);
+		server.registerTool(
+			createDataTableTool.name,
+			createDataTableTool.config,
+			createDataTableTool.handler,
+		);
+
+		const renameDataTableTool = createRenameDataTableTool(user, dataTableOps, this.telemetry);
+		server.registerTool(
+			renameDataTableTool.name,
+			renameDataTableTool.config,
+			renameDataTableTool.handler,
+		);
+
+		const addDataTableColumnTool = createAddDataTableColumnTool(user, dataTableOps, this.telemetry);
+		server.registerTool(
+			addDataTableColumnTool.name,
+			addDataTableColumnTool.config,
+			addDataTableColumnTool.handler,
+		);
+
+		const deleteDataTableColumnTool = createDeleteDataTableColumnTool(
+			user,
+			dataTableOps,
+			this.telemetry,
+		);
+		server.registerTool(
+			deleteDataTableColumnTool.name,
+			deleteDataTableColumnTool.config,
+			deleteDataTableColumnTool.handler,
+		);
+
+		const renameDataTableColumnTool = createRenameDataTableColumnTool(
+			user,
+			dataTableOps,
+			this.telemetry,
+		);
+		server.registerTool(
+			renameDataTableColumnTool.name,
+			renameDataTableColumnTool.config,
+			renameDataTableColumnTool.handler,
+		);
+
+		const addDataTableRowsTool = createAddDataTableRowsTool(user, dataTableOps, this.telemetry);
+		server.registerTool(
+			addDataTableRowsTool.name,
+			addDataTableRowsTool.config,
+			addDataTableRowsTool.handler,
+		);
+
+		// Workflow builder tools (enabled via N8N_MCP_BUILDER_ENABLED)
+		if (builderEnabled) {
+			await this.registerBuilderTools(server, user);
+>>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 		}
 		externalToolRegistry.registerResources(server);
 
@@ -264,12 +438,85 @@ export class McpService {
 			createGetWorkflowSdkReferenceTool(user, this.telemetry),
 		);
 
+<<<<<<< HEAD
 		return {
 			tools,
 			registerResources: (server: InstanceType<typeof McpServer>) => {
 				server.resource(
 					'workflow-sdk-reference',
 					'n8n://workflow-sdk/reference',
+=======
+		const validateTool = createValidateWorkflowCodeTool(user, this.telemetry);
+		server.registerTool(validateTool.name, validateTool.config, validateTool.handler);
+
+		const createTool = createCreateWorkflowFromCodeTool(
+			user,
+			this.workflowCreationService,
+			this.workflowFinderService,
+			this.urlService,
+			this.telemetry,
+			this.nodeTypes,
+			this.credentialsService,
+			this.projectRepository,
+		);
+		server.registerTool(createTool.name, createTool.config, createTool.handler);
+
+		const searchProjectsTool = createSearchProjectsTool(
+			user,
+			this.projectRepository,
+			this.telemetry,
+		);
+		server.registerTool(
+			searchProjectsTool.name,
+			searchProjectsTool.config,
+			searchProjectsTool.handler,
+		);
+
+		const searchFoldersTool = createSearchFoldersTool(
+			user,
+			this.folderRepository,
+			this.projectService,
+			this.telemetry,
+		);
+		server.registerTool(
+			searchFoldersTool.name,
+			searchFoldersTool.config,
+			searchFoldersTool.handler,
+		);
+
+		const archiveTool = createArchiveWorkflowTool(
+			user,
+			this.workflowFinderService,
+			this.workflowService,
+			this.telemetry,
+			this.collaborationService,
+		);
+		server.registerTool(archiveTool.name, archiveTool.config, archiveTool.handler);
+
+		const updateTool = createUpdateWorkflowTool(
+			user,
+			this.workflowFinderService,
+			this.workflowService,
+			this.urlService,
+			this.telemetry,
+			this.nodeTypes,
+			this.credentialsService,
+			this.sharedWorkflowRepository,
+			this.collaborationService,
+		);
+		server.registerTool(updateTool.name, updateTool.config, updateTool.handler);
+
+		// SDK reference as MCP resource — for clients that support resources.
+		server.resource(
+			'workflow-sdk-reference',
+			'n8n://workflow-sdk/reference',
+			{
+				description:
+					'n8n Workflow SDK reference — patterns, expressions, and rules for building workflows. Get this FIRST before building workflows to learn the SDK.',
+			},
+			async () => ({
+				contents: [
+>>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 					{
 						description:
 							'n8n Workflow SDK reference â€” patterns, expressions, and rules for building workflows. Get this FIRST before building workflows to learn the SDK.',
