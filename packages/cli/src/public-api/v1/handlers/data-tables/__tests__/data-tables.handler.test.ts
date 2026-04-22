@@ -5,7 +5,12 @@ import type { Response } from 'express';
 
 import { DataTableRepository } from '@/modules/data-table/data-table.repository';
 import { DataTableService } from '@/modules/data-table/data-table.service';
+import { BadRequestError } from '@/errors/response-errors/bad-request.error';
+import { ConflictError } from '@/errors/response-errors/conflict.error';
 import { DataTableNotFoundError } from '@/modules/data-table/errors/data-table-not-found.error';
+import { DataTableColumnNotFoundError } from '@/modules/data-table/errors/data-table-column-not-found.error';
+import { DataTableColumnNameConflictError } from '@/modules/data-table/errors/data-table-column-name-conflict.error';
+import { DataTableSystemColumnNameConflictError } from '@/modules/data-table/errors/data-table-system-column-name-conflict.error';
 import { ProjectService } from '@/services/project.service.ee';
 import type { DataTableRequest } from '@/public-api/types';
 import * as middlewares from '@/public-api/v1/shared/middlewares/global.middleware';
@@ -18,6 +23,7 @@ jest.spyOn(middlewares, 'validCursor').mockReturnValue(mockMiddleware);
 
 const mainHandler = require('../data-tables.handler');
 const handler = require('../data-tables.rows.handler');
+const columnsHandler = require('../data-tables.columns.handler');
 
 describe('DataTable Handler', () => {
 	let mockDataTableService: jest.Mocked<DataTableService>;
@@ -792,6 +798,143 @@ describe('DataTable Handler', () => {
 			expect(mockResponse.json).toHaveBeenCalledWith({
 				message: expect.stringContaining(nonExistentDataTableId),
 			});
+		});
+	});
+
+	describe('listDataTableColumns', () => {
+		it('should list columns successfully', async () => {
+			const req = {
+				params: { dataTableId },
+				user: { id: userId },
+			} as unknown as DataTableRequest.ListColumns;
+
+			const mockColumns = [
+				{ id: 'col-1', name: 'name', type: 'string', index: 0, dataTableId },
+				{ id: 'col-2', name: 'age', type: 'number', index: 1, dataTableId },
+			];
+			mockDataTableService.getColumns.mockResolvedValue(mockColumns as any);
+
+			await columnsHandler.listDataTableColumns[2](req, mockResponse as Response);
+
+			expect(mockDataTableService.getColumns).toHaveBeenCalledWith(dataTableId, projectId);
+			expect(mockResponse.json).toHaveBeenCalledWith(mockColumns);
+		});
+
+		it('should throw DataTableNotFoundError when data table not found', async () => {
+			const req = {
+				params: { dataTableId },
+				user: { id: userId },
+			} as unknown as DataTableRequest.ListColumns;
+
+			mockDataTableRepository.findOne.mockRejectedValue(new DataTableNotFoundError(dataTableId));
+
+			await expect(
+				columnsHandler.listDataTableColumns[2](req, mockResponse as Response),
+			).rejects.toThrow(DataTableNotFoundError);
+		});
+	});
+
+	describe('createDataTableColumn', () => {
+		it('should create column and return 201', async () => {
+			const req = {
+				params: { dataTableId },
+				body: { name: 'email', type: 'string' },
+				user: { id: userId },
+			} as unknown as DataTableRequest.CreateColumn;
+
+			const mockColumn = { id: 'col-new', name: 'email', type: 'string', index: 0, dataTableId };
+			mockDataTableService.addColumn.mockResolvedValue(mockColumn as any);
+
+			await columnsHandler.createDataTableColumn[2](req, mockResponse as Response);
+
+			expect(mockDataTableService.addColumn).toHaveBeenCalledWith(dataTableId, projectId, {
+				name: 'email',
+				type: 'string',
+			});
+			expect(mockResponse.status).toHaveBeenCalledWith(201);
+			expect(mockResponse.json).toHaveBeenCalledWith(mockColumn);
+		});
+
+		it('should throw BadRequestError on invalid body', async () => {
+			const req = {
+				params: { dataTableId },
+				body: { name: '', type: 'invalid' },
+				user: { id: userId },
+			} as unknown as DataTableRequest.CreateColumn;
+
+			await expect(
+				columnsHandler.createDataTableColumn[2](req, mockResponse as Response),
+			).rejects.toThrow(BadRequestError);
+		});
+
+		it('should throw ConflictError on duplicate column name', async () => {
+			const req = {
+				params: { dataTableId },
+				body: { name: 'existing', type: 'string' },
+				user: { id: userId },
+			} as unknown as DataTableRequest.CreateColumn;
+
+			mockDataTableService.addColumn.mockRejectedValue(
+				new DataTableColumnNameConflictError('existing', 'test-table'),
+			);
+
+			await expect(
+				columnsHandler.createDataTableColumn[2](req, mockResponse as Response),
+			).rejects.toThrow(ConflictError);
+		});
+
+		it('should throw ConflictError on system column name', async () => {
+			const req = {
+				params: { dataTableId },
+				body: { name: 'id', type: 'string' },
+				user: { id: userId },
+			} as unknown as DataTableRequest.CreateColumn;
+
+			mockDataTableService.addColumn.mockRejectedValue(
+				new DataTableSystemColumnNameConflictError('id'),
+			);
+
+			await expect(
+				columnsHandler.createDataTableColumn[2](req, mockResponse as Response),
+			).rejects.toThrow(ConflictError);
+		});
+	});
+
+	describe('deleteDataTableColumn', () => {
+		const columnId = 'test-column-id';
+
+		it('should delete column and return 204', async () => {
+			const req = {
+				params: { dataTableId, columnId },
+				user: { id: userId },
+			} as unknown as DataTableRequest.DeleteColumn;
+
+			mockDataTableService.deleteColumn.mockResolvedValue(true);
+
+			await columnsHandler.deleteDataTableColumn[2](req, mockResponse as Response);
+
+			expect(mockDataTableService.deleteColumn).toHaveBeenCalledWith(
+				dataTableId,
+				projectId,
+				columnId,
+			);
+			expect(mockResponse.status).toHaveBeenCalledWith(204);
+			expect(mockResponse.send).toHaveBeenCalled();
+		});
+
+		it('should throw DataTableColumnNotFoundError when column not found', async () => {
+			const req = {
+				params: { dataTableId, columnId },
+				user: { id: userId },
+			} as unknown as DataTableRequest.DeleteColumn;
+
+			mockDataTableService.deleteColumn.mockRejectedValue(
+				new DataTableColumnNotFoundError(dataTableId, columnId),
+			);
+
+			await expect(
+				columnsHandler.deleteDataTableColumn[2](req, mockResponse as Response),
+			).rejects.toThrow(DataTableColumnNotFoundError);
 		});
 	});
 });
