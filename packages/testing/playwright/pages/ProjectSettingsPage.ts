@@ -57,15 +57,9 @@ export class ProjectSettingsPage extends BasePage {
 		return this.page.getByTestId('project-members-table');
 	}
 
-	async getMemberRowCount() {
-		const table = this.getMembersTable();
-		const rows = table.locator('tbody tr');
-		return await rows.count();
-	}
-
 	async expectTableHasMemberCount(expectedCount: number) {
-		const actualCount = await this.getMemberRowCount();
-		expect(actualCount).toBe(expectedCount);
+		const rows = this.getMembersTable().locator('tbody tr');
+		await expect(rows).toHaveCount(expectedCount);
 	}
 
 	getTitle() {
