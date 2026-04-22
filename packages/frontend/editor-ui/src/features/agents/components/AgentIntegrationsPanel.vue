@@ -19,6 +19,15 @@ const props = defineProps<{
 	agentName: string;
 }>();
 
+const emit = defineEmits<{
+	/**
+	 * Fires on initial fetch and after every connect/disconnect with the current
+	 * number of connected integrations. Used by the sidebar to auto-expand the
+	 * Triggers section when the agent already has integrations configured.
+	 */
+	'connected-count': [count: number];
+}>();
+
 const rootStore = useRootStore();
 const uiStore = useUIStore();
 
@@ -281,6 +290,11 @@ watch(credentialModalOpen, (isOpen, wasOpen) => {
 onMounted(async () => {
 	await Promise.all([fetchStatus(), fetchCredentials()]);
 });
+
+const connectedIntegrationCount = computed(
+	() => Object.values(statuses.value).filter((s) => s === 'connected').length,
+);
+watch(connectedIntegrationCount, (count) => emit('connected-count', count), { immediate: true });
 </script>
 
 <template>
