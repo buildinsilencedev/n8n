@@ -51,6 +51,8 @@ import {
 	fetchAndExtract,
 	maybeSummarize,
 	braveSearch,
+	googleMapsSearch,
+	samGovSearch,
 	searxngSearch,
 	LRUCache,
 } from './web-research';
@@ -1281,8 +1283,7 @@ export class InstanceAiAdapterService {
 			if (!searchResolved) {
 				const config = await settingsService.resolveSearchConfig(user);
 				resolvedSearchMethod = this.buildSearchMethod(
-					config.braveApiKey ?? '',
-					config.searxngUrl ?? '',
+					config,
 					searchCacheRef,
 					searchProxyConfig,
 					userId,
@@ -1350,8 +1351,11 @@ export class InstanceAiAdapterService {
 	 *   3. Disabled (returns undefined)
 	 */
 	private buildSearchMethod(
-		apiKey: string,
-		searxngUrl: string,
+		searchConfig: {
+			provider: 'brave' | 'searxng' | 'googleMaps' | 'samGov' | 'none';
+			apiKey?: string;
+			url?: string;
+		},
 		cache: LRUCache<WebSearchResponse>,
 		searchProxyConfig?: ServiceProxyConfig,
 		userId?: string,
@@ -1382,25 +1386,49 @@ export class InstanceAiAdapterService {
 			};
 		}
 
-		if (apiKey) {
+		if (searchConfig.provider === 'brave' && searchConfig.apiKey) {
 			return async (query: string, options?: SearchOptions) => {
 				const cacheKey = `${keyPrefix}${JSON.stringify([query, options ?? {}])}`;
 				const cached = cache.get(cacheKey);
 				if (cached) return cached;
 
-				const result = await braveSearch(apiKey, query, options ?? {});
+				const result = await braveSearch(searchConfig.apiKey!, query, options ?? {});
 				cache.set(cacheKey, result);
 				return result;
 			};
 		}
 
-		if (searxngUrl) {
+		if (searchConfig.provider === 'searxng' && searchConfig.url) {
 			return async (query: string, options?: SearchOptions) => {
 				const cacheKey = `${keyPrefix}${JSON.stringify([query, options ?? {}])}`;
 				const cached = cache.get(cacheKey);
 				if (cached) return cached;
 
-				const result = await searxngSearch(searxngUrl, query, options ?? {});
+				const result = await searxngSearch(searchConfig.url!, query, options ?? {});
+				cache.set(cacheKey, result);
+				return result;
+			};
+		}
+
+		if (searchConfig.provider === 'googleMaps' && searchConfig.apiKey) {
+			return async (query: string, options?: SearchOptions) => {
+				const cacheKey = `${keyPrefix}${JSON.stringify([query, options ?? {}])}`;
+				const cached = cache.get(cacheKey);
+				if (cached) return cached;
+
+				const result = await googleMapsSearch(searchConfig.apiKey!, query, options ?? {});
+				cache.set(cacheKey, result);
+				return result;
+			};
+		}
+
+		if (searchConfig.provider === 'samGov' && searchConfig.apiKey) {
+			return async (query: string, options?: SearchOptions) => {
+				const cacheKey = `${keyPrefix}${JSON.stringify([query, options ?? {}])}`;
+				const cached = cache.get(cacheKey);
+				if (cached) return cached;
+
+				const result = await samGovSearch(searchConfig.apiKey!, query, options ?? {});
 				cache.set(cacheKey, result);
 				return result;
 			};

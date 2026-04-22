@@ -68,8 +68,11 @@ export const ADDITIONAL_FUNCTIONS = `Additional SDK functions:
  */
 export const WORKFLOW_RULES = `Follow these rules strictly when generating workflows:
 
-1. **Always use newCredential() for authentication**
-   - When a node needs credentials, always use \`newCredential('Name')\` in the credentials config
+1. **Use SDK credential helpers for authentication**
+   - For a credential the user still needs to wire manually, use \`newCredential('Name')\`
+   - For an existing credential you already discovered via tooling, use \`existingCredential('Name', 'cred-123')\` or \`existingCredential({ id: 'cred-123', name: 'Name' })\`
    - NEVER use placeholder strings, fake API keys, or hardcoded auth values
-   - Example: \`credentials: { slackApi: newCredential('Slack Bot') }\`
+   - Examples:
+     - \`credentials: { slackApi: newCredential('Slack Bot') }\`
+     - \`credentials: { slackApi: existingCredential('Slack Bot', 'cred-123') }\`
    - The credential type must match what the node expects`;

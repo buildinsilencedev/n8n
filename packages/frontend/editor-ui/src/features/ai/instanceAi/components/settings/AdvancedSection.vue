@@ -2,6 +2,7 @@
 import { N8nHeading, N8nInput, N8nInputNumber, N8nInputLabel } from '@n8n/design-system';
 import { ElSwitch } from 'element-plus';
 import { useI18n } from '@n8n/i18n';
+import type { BaseTextKey } from '@n8n/i18n';
 import { useSettingsField } from './useSettingsField';
 
 const i18n = useI18n();
@@ -25,6 +26,69 @@ const { store, getString, getNumber, getBool } = useSettingsField();
 				size="small"
 				:min="1"
 				@update:model-value="store.setField('subAgentMaxSteps', $event ?? 100)"
+			/>
+		</N8nInputLabel>
+
+		<div :class="$style.switchRow">
+			<span :class="$style.switchLabel">{{
+				i18n.baseText('instanceAi.settings.swarmEnabled.label' as BaseTextKey)
+			}}</span>
+			<ElSwitch
+				:model-value="getBool('swarmEnabled')"
+				@update:model-value="store.setField('swarmEnabled', Boolean($event))"
+			/>
+		</div>
+
+		<N8nInputLabel
+			:label="i18n.baseText('instanceAi.settings.swarmMaxWorkers.label' as BaseTextKey)"
+			:bold="false"
+			size="small"
+		>
+			<N8nInputNumber
+				:class="$style.numberInput"
+				:model-value="getNumber('swarmMaxWorkers') ?? 10"
+				size="small"
+				:min="1"
+				:max="10"
+				@update:model-value="store.setField('swarmMaxWorkers', $event ?? 10)"
+			/>
+		</N8nInputLabel>
+
+		<N8nInputLabel
+			:label="i18n.baseText('instanceAi.settings.swarmMaxPromptTokens.label' as BaseTextKey)"
+			:bold="false"
+			size="small"
+		>
+			<N8nInputNumber
+				:class="$style.numberInput"
+				:model-value="getNumber('swarmMaxPromptTokens') || 0"
+				size="small"
+				:min="0"
+				@update:model-value="
+					store.setField('swarmMaxPromptTokens', $event && $event > 0 ? $event : null)
+				"
+			/>
+		</N8nInputLabel>
+
+		<N8nInputLabel
+			:label="
+				i18n.baseText('instanceAi.settings.swarmMaxEstimatedCostUsd.label' as BaseTextKey)
+			"
+			:bold="false"
+			size="small"
+		>
+			<N8nInputNumber
+				:class="$style.numberInput"
+				:model-value="getNumber('swarmMaxEstimatedCostUsd') || 0"
+				size="small"
+				:min="0"
+				:precision="3"
+				@update:model-value="
+					store.setField(
+						'swarmMaxEstimatedCostUsd',
+						$event && $event > 0 ? Number($event) : null,
+					)
+				"
 			/>
 		</N8nInputLabel>
 

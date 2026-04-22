@@ -11,6 +11,7 @@ import type { AccessToken } from '../database/entities/oauth-access-token.entity
 import type { RefreshToken } from '../database/entities/oauth-refresh-token.entity';
 import { AccessTokenRepository } from '../database/repositories/oauth-access-token.repository';
 import { RefreshTokenRepository } from '../database/repositories/oauth-refresh-token.repository';
+import { SUPPORTED_SCOPES } from '../mcp-oauth.constants';
 import { McpOAuthTokenService } from '../mcp-oauth-token.service';
 
 const instanceSettings = mock<InstanceSettings>({ encryptionKey: 'test-key' });
@@ -76,6 +77,7 @@ describe('McpOAuthTokenService', () => {
 			expect(decoded.sub).toBe(userId);
 			expect(decoded.aud).toBe('mcp-server-api');
 			expect(decoded.client_id).toBe(clientId);
+			expect(decoded.scope).toBe(SUPPORTED_SCOPES.join(' '));
 			expect(decoded.meta.isOAuth).toBe(true);
 			expect(decoded.jti).toBeDefined();
 			expect(decoded.iat).toBeDefined();
@@ -146,6 +148,7 @@ describe('McpOAuthTokenService', () => {
 				token_type: 'Bearer',
 				expires_in: 3600,
 				refresh_token: expect.stringMatching(/^[a-f0-9]{64}$/),
+				scope: SUPPORTED_SCOPES.join(' '),
 			});
 
 			// Verify transaction was used
@@ -202,7 +205,7 @@ describe('McpOAuthTokenService', () => {
 			expect(result).toEqual({
 				token: accessToken,
 				clientId,
-				scopes: [],
+				scopes: SUPPORTED_SCOPES,
 				extra: {
 					userId,
 				},

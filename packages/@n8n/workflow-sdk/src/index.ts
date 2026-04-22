@@ -16,6 +16,7 @@ export type {
 	TriggerInput,
 	SubnodeConfig,
 	CredentialReference,
+	ExistingCredentialReference,
 	OnError,
 	DeclaredConnection,
 	// Subnode instance types
@@ -55,6 +56,7 @@ export type {
 	StickyFn,
 	PlaceholderFn,
 	NewCredentialFn,
+	ExistingCredentialFn,
 	// MergeFn removed - merge() is internal only, use node() + .input(n) syntax
 	IfElseFn,
 	IfElseConfig,
@@ -91,6 +93,7 @@ export {
 	sticky,
 	placeholder,
 	newCredential,
+	existingCredential,
 	ifElse,
 	switchCase,
 	merge,

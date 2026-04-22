@@ -76,6 +76,15 @@ export const instanceAiAgentKindSchema = z.enum([
 ]);
 export type InstanceAiAgentKind = z.infer<typeof instanceAiAgentKindSchema>;
 
+export const instanceAiSwarmRoleSchema = z.enum(['coordinator', 'worker', 'synthesizer']);
+export type InstanceAiSwarmRole = z.infer<typeof instanceAiSwarmRoleSchema>;
+
+export const instanceAiSwarmBudgetModeSchema = z.enum(['soft_cap']);
+export type InstanceAiSwarmBudgetMode = z.infer<typeof instanceAiSwarmBudgetModeSchema>;
+
+export const instanceAiSwarmModeSchema = z.enum(['off', 'auto']);
+export type InstanceAiSwarmMode = z.infer<typeof instanceAiSwarmModeSchema>;
+
 // ---------------------------------------------------------------------------
 // Domain access gating (shared across any tool that fetches external URLs)
 // ---------------------------------------------------------------------------
@@ -121,6 +130,23 @@ export const agentSpawnedTargetResourceSchema = z.object({
 });
 export type InstanceAiTargetResource = z.infer<typeof agentSpawnedTargetResourceSchema>;
 
+export const instanceAiSwarmMetadataSchema = z.object({
+	groupId: z.string(),
+	role: instanceAiSwarmRoleSchema,
+	workerIndex: z.number().int().positive().optional(),
+	workerCount: z.number().int().positive().optional(),
+});
+export type InstanceAiSwarmMetadata = z.infer<typeof instanceAiSwarmMetadataSchema>;
+
+export const instanceAiUsageSummarySchema = z.object({
+	inputTokens: z.number().int().nonnegative().optional(),
+	outputTokens: z.number().int().nonnegative().optional(),
+	totalTokens: z.number().int().nonnegative().optional(),
+	estimatedCostUsd: z.number().nonnegative().optional(),
+	completedWorkers: z.number().int().nonnegative().optional(),
+});
+export type InstanceAiUsageSummary = z.infer<typeof instanceAiUsageSummarySchema>;
+
 export const agentSpawnedPayloadSchema = z.object({
 	parentId: z.string().describe("Orchestrator's agentId"),
 	role: z.string().describe('Free-form role description'),
@@ -137,12 +163,14 @@ export const agentSpawnedPayloadSchema = z.object({
 	targetResource: agentSpawnedTargetResourceSchema
 		.optional()
 		.describe('Resource this agent works on'),
+	swarm: instanceAiSwarmMetadataSchema.optional(),
 });
 
 export const agentCompletedPayloadSchema = z.object({
 	role: z.string(),
 	result: z.string().describe('Synthesized answer'),
 	error: z.string().optional(),
+	usage: instanceAiUsageSummarySchema.optional(),
 });
 
 export const textDeltaPayloadSchema = z.object({
@@ -680,6 +708,8 @@ export interface InstanceAiAgentNode {
 	goal?: string;
 	/** Resource this agent works on. */
 	targetResource?: InstanceAiTargetResource;
+	/** Swarm metadata for coordinated fan-out runs. */
+	swarm?: InstanceAiSwarmMetadata;
 	/** Transient status message (e.g. "Recalling conversation..."). Cleared when empty. */
 	statusMessage?: string;
 	status: InstanceAiAgentStatus;
@@ -695,6 +725,7 @@ export interface InstanceAiAgentNode {
 	planItems?: PlannedTaskArg[];
 	result?: string;
 	error?: string;
+	usage?: InstanceAiUsageSummary;
 	errorDetails?: {
 		statusCode?: number;
 		provider?: string;
@@ -891,6 +922,11 @@ export interface InstanceAiAdminSettingsResponse {
 	embedderModel: string;
 	semanticRecallTopK: number;
 	subAgentMaxSteps: number;
+	swarmEnabled: boolean;
+	swarmMaxWorkers: number;
+	swarmBudgetMode: InstanceAiSwarmBudgetMode;
+	swarmMaxEstimatedCostUsd: number | null;
+	swarmMaxPromptTokens: number | null;
 	browserMcp: boolean;
 	permissions: InstanceAiPermissions;
 	mcpServers: string;
@@ -910,6 +946,11 @@ export class InstanceAiAdminSettingsUpdateRequest extends Z.class({
 	embedderModel: z.string().optional(),
 	semanticRecallTopK: z.number().int().positive().optional(),
 	subAgentMaxSteps: z.number().int().positive().optional(),
+	swarmEnabled: z.boolean().optional(),
+	swarmMaxWorkers: z.number().int().positive().max(10).optional(),
+	swarmBudgetMode: instanceAiSwarmBudgetModeSchema.optional(),
+	swarmMaxEstimatedCostUsd: z.number().nonnegative().nullable().optional(),
+	swarmMaxPromptTokens: z.number().int().positive().nullable().optional(),
 	browserMcp: z.boolean().optional(),
 	permissions: instanceAiPermissionsSchema.partial().optional(),
 	mcpServers: z.string().optional(),
@@ -932,12 +973,14 @@ export interface InstanceAiUserPreferencesResponse {
 	credentialType: string | null;
 	credentialName: string | null;
 	modelName: string;
+	swarmMode: InstanceAiSwarmMode;
 	localGatewayDisabled: boolean;
 }
 
 export class InstanceAiUserPreferencesUpdateRequest extends Z.class({
 	credentialId: z.string().nullable().optional(),
 	modelName: z.string().optional(),
+	swarmMode: instanceAiSwarmModeSchema.optional(),
 	localGatewayDisabled: z.boolean().optional(),
 }) {}
 

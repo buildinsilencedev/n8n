@@ -12,7 +12,10 @@ type StringField = keyof {
 		: never]: true;
 };
 type NumberField = keyof {
-	[K in keyof InstanceAiAdminSettingsResponse as InstanceAiAdminSettingsResponse[K] extends number
+	[K in keyof InstanceAiAdminSettingsResponse as Exclude<
+		InstanceAiAdminSettingsResponse[K],
+		undefined
+	> extends number | null
 		? K
 		: never]: true;
 };
@@ -37,10 +40,12 @@ export function useSettingsField() {
 		return store.settings?.[key] ?? '';
 	}
 
-	function getNumber(key: NumberField & keyof InstanceAiAdminSettingsUpdateRequest): number {
+	function getNumber(key: NumberField & keyof InstanceAiAdminSettingsUpdateRequest): number | null {
 		const draftVal = store.draft[key];
-		if (draftVal !== undefined) return Number(draftVal);
-		return store.settings?.[key] ?? 0;
+		if (draftVal !== undefined) {
+			return draftVal === null ? null : Number(draftVal);
+		}
+		return (store.settings?.[key] as number | null | undefined) ?? null;
 	}
 
 	function getBool(key: BoolField & keyof InstanceAiAdminSettingsUpdateRequest): boolean {

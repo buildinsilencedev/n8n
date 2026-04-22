@@ -15,6 +15,8 @@ import { NodeTypes } from '@/node-types';
 
 import type { ChatHubTool } from './chat-hub-tool.entity';
 import { ChatHubToolRepository } from './chat-hub-tool.repository';
+import { ChatHubAgentValidationService } from './chat-hub-agent-validation.service';
+import { getSelectedPersonalAgentId } from './personal-agent-tool.utils';
 
 @Service()
 export class ChatHubToolService {
@@ -22,6 +24,7 @@ export class ChatHubToolService {
 		private readonly logger: Logger,
 		private readonly chatToolRepository: ChatHubToolRepository,
 		private readonly nodeTypes: NodeTypes,
+		private readonly chatHubAgentValidationService: ChatHubAgentValidationService,
 	) {
 		this.logger = this.logger.scoped('chat-hub');
 	}
@@ -50,6 +53,10 @@ export class ChatHubToolService {
 
 	async getToolIdsForAgent(agentId: string, trx?: EntityManager): Promise<string[]> {
 		return await this.chatToolRepository.getToolIdsForAgent(agentId, trx);
+	}
+
+	async getToolsByIds(toolIds: string[], userId: string, trx?: EntityManager): Promise<ChatHubTool[]> {
+		return await this.chatToolRepository.getByIds(toolIds, userId, trx);
 	}
 
 	async setSessionTools(sessionId: string, toolIds: string[], trx?: EntityManager): Promise<void> {
@@ -117,6 +124,14 @@ export class ChatHubToolService {
 
 			if (updates.definition !== undefined) {
 				this.validateToolExpressions(updates.definition);
+				const selectedAgentId = getSelectedPersonalAgentId(updates.definition);
+				if (selectedAgentId) {
+					const attachedAgentIds = await this.chatToolRepository.getAgentIdsForTool(id, em);
+					this.chatHubAgentValidationService.validatePersonalAgentToolUpdate(
+						selectedAgentId,
+						attachedAgentIds,
+					);
+				}
 				updateData.definition = updates.definition;
 				updateData.name = updates.definition.name;
 				updateData.type = updates.definition.type;

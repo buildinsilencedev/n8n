@@ -12,11 +12,19 @@ import { InstanceSettings } from 'n8n-core';
 import type { IRun } from 'n8n-workflow';
 import { createEmptyRunExecutionData, ManualExecutionCancelledError } from 'n8n-workflow';
 
-import { McpService } from '../mcp.service';
+import { McpService, createExternalMcpVersion } from '../mcp.service';
+import {
+	CODE_BUILDER_SEARCH_NODES_TOOL,
+	MCP_CREATE_WORKFLOW_FROM_CODE_TOOL,
+	MCP_GET_SDK_REFERENCE_TOOL,
+} from '../tools/workflow-builder/constants';
 import { WorkflowBuilderToolsService } from '../tools/workflow-builder/workflow-builder-tools.service';
 
 import { ActiveExecutions } from '@/active-executions';
+import { N8N_VERSION } from '@/constants';
 import { CredentialsService } from '@/credentials/credentials.service';
+import { ExecutionService } from '@/executions/execution.service';
+import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
 import { DataTableProxyService } from '@/modules/data-table/data-table-proxy.service';
 import { NodeTypes } from '@/node-types';
 import { ProjectService } from '@/services/project.service.ee';
@@ -27,14 +35,54 @@ import { WorkflowRunner } from '@/workflow-runner';
 import { WorkflowCreationService } from '@/workflows/workflow-creation.service';
 import { WorkflowFinderService } from '@/workflows/workflow-finder.service';
 import { WorkflowService } from '@/workflows/workflow.service';
-import { ExecutionService } from '@/executions/execution.service';
 
 describe('McpService', () => {
-	let mcpService: McpService;
 	let activeExecutions: ActiveExecutions;
 	let executionsConfig: ExecutionsConfig;
 	let instanceSettings: InstanceSettings;
 	let logger: Logger;
+
+	const createMcpService = (options?: {
+		builderEnabled?: boolean;
+		workflowBuilderToolsService?: WorkflowBuilderToolsService;
+		executionsMode?: 'regular' | 'queue';
+	}) => {
+		const executionsConfigOverride = options?.executionsMode
+			? mockInstance(ExecutionsConfig, { mode: options.executionsMode })
+			: executionsConfig;
+
+		return new McpService(
+			logger,
+			executionsConfigOverride,
+			instanceSettings,
+			mockInstance(WorkflowFinderService),
+			mockInstance(WorkflowService),
+			mockInstance(UrlService),
+			mockInstance(CredentialsService),
+			mockInstance(LoadNodesAndCredentials),
+			activeExecutions,
+			mockInstance(GlobalConfig, {
+				endpoints: {
+					webhook: '/webhook',
+					webhookTest: '/webhook-test',
+					mcpBuilderEnabled: options?.builderEnabled ?? false,
+				},
+			}),
+			mockInstance(Telemetry),
+			mockInstance(WorkflowRunner),
+			mockInstance(RoleService),
+			mockInstance(ProjectService),
+			options?.workflowBuilderToolsService ?? mockInstance(WorkflowBuilderToolsService),
+			mockInstance(WorkflowCreationService),
+			mockInstance(NodeTypes),
+			mockInstance(ProjectRepository),
+			mockInstance(FolderRepository),
+			mockInstance(SharedWorkflowRepository),
+			mockInstance(ExecutionRepository),
+			mockInstance(ExecutionService),
+			mockInstance(DataTableProxyService),
+		);
+	};
 
 	beforeEach(() => {
 		activeExecutions = mockInstance(ActiveExecutions);
@@ -45,78 +93,27 @@ describe('McpService', () => {
 			hostId: 'test-host-id',
 		});
 		logger = mockLogger();
-
-		mcpService = new McpService(
-			logger,
-			executionsConfig,
-			instanceSettings,
-			mockInstance(WorkflowFinderService),
-			mockInstance(WorkflowService),
-			mockInstance(UrlService),
-			mockInstance(CredentialsService),
-			activeExecutions,
-			mockInstance(GlobalConfig, {
-				endpoints: { webhook: '/webhook', webhookTest: '/webhook-test' },
-			}),
-			mockInstance(Telemetry),
-			mockInstance(WorkflowRunner),
-			mockInstance(RoleService),
-			mockInstance(ProjectService),
-			mockInstance(WorkflowBuilderToolsService),
-			mockInstance(WorkflowCreationService),
-			mockInstance(NodeTypes),
-			mockInstance(ProjectRepository),
-			mockInstance(FolderRepository),
-			mockInstance(SharedWorkflowRepository),
-			mockInstance(ExecutionRepository),
-			mockInstance(ExecutionService),
-			mockInstance(DataTableProxyService),
-		);
 	});
 
 	describe('Queue Mode Detection', () => {
 		it('should return false for isQueueMode when mode is regular', () => {
+			const mcpService = createMcpService();
 			expect(mcpService.isQueueMode).toBe(false);
 		});
 
 		it('should return true for isQueueMode when mode is queue', () => {
-			// Create a new service with queue mode enabled
-			const queueExecutionsConfig = mockInstance(ExecutionsConfig, {
-				mode: 'queue',
-			});
-
-			const queueMcpService = new McpService(
-				mockLogger(),
-				queueExecutionsConfig,
-				instanceSettings,
-				mockInstance(WorkflowFinderService),
-				mockInstance(WorkflowService),
-				mockInstance(UrlService),
-				mockInstance(CredentialsService),
-				activeExecutions,
-				mockInstance(GlobalConfig, {
-					endpoints: { webhook: '/webhook', webhookTest: '/webhook-test' },
-				}),
-				mockInstance(Telemetry),
-				mockInstance(WorkflowRunner),
-				mockInstance(RoleService),
-				mockInstance(ProjectService),
-				mockInstance(WorkflowBuilderToolsService),
-				mockInstance(WorkflowCreationService),
-				mockInstance(NodeTypes),
-				mockInstance(ProjectRepository),
-				mockInstance(FolderRepository),
-				mockInstance(SharedWorkflowRepository),
-				mockInstance(ExecutionRepository),
-				mockInstance(ExecutionService),
-				mockInstance(DataTableProxyService),
-			);
-
+			const queueMcpService = createMcpService({ executionsMode: 'queue' });
 			expect(queueMcpService.isQueueMode).toBe(true);
 		});
 	});
 
 	describe('Pending Response Management', () => {
+		let mcpService: McpService;
+
+		beforeEach(() => {
+			mcpService = createMcpService();
+		});
+
 		describe('createPendingResponse', () => {
 			it('should create a pending response with a deferred promise', () => {
 				const executionId = 'exec-123';
@@ -171,7 +168,6 @@ describe('McpService', () => {
 			});
 
 			it('should ignore responses for unknown executions and log warning', () => {
-				// Should not throw
 				mcpService.handleWorkerResponse('unknown-exec', undefined);
 				expect(mcpService.pendingExecutionCount).toBe(0);
 				expect(logger.warn).toHaveBeenCalledWith('Received MCP response for unknown execution', {
@@ -192,10 +188,8 @@ describe('McpService', () => {
 			});
 
 			it('should handle removing non-existent response gracefully without logging', () => {
-				// Should not throw
 				mcpService.removePendingResponse('non-existent');
 				expect(mcpService.pendingExecutionCount).toBe(0);
-				// Should not log debug for non-existent response
 				expect(logger.debug).not.toHaveBeenCalledWith(
 					'Removed pending MCP response',
 					expect.anything(),
@@ -208,7 +202,6 @@ describe('McpService', () => {
 				const executionId = 'exec-cancel';
 				const deferred = mcpService.createPendingResponse(executionId);
 
-				// Attach error handler before cancelling to prevent unhandled rejection
 				const errorPromise = deferred.promise.catch((error) => error);
 
 				mcpService.cancelPendingExecution(executionId, 'User cancelled');
@@ -223,7 +216,6 @@ describe('McpService', () => {
 				const deferred = mcpService.createPendingResponse(executionId);
 				(activeExecutions.has as jest.Mock).mockReturnValue(true);
 
-				// Attach error handler to prevent unhandled rejection
 				deferred.promise.catch(() => {});
 
 				mcpService.cancelPendingExecution(executionId);
@@ -235,7 +227,6 @@ describe('McpService', () => {
 			});
 
 			it('should handle cancelling non-existent execution gracefully', () => {
-				// Should not throw
 				mcpService.cancelPendingExecution('non-existent');
 			});
 		});
@@ -246,7 +237,6 @@ describe('McpService', () => {
 				const deferred2 = mcpService.createPendingResponse('exec-2');
 				const deferred3 = mcpService.createPendingResponse('exec-3');
 
-				// Attach error handlers before cancelling to prevent unhandled rejections
 				const errorPromise1 = deferred1.promise.catch((error) => error);
 				const errorPromise2 = deferred2.promise.catch((error) => error);
 				const errorPromise3 = deferred3.promise.catch((error) => error);
@@ -268,99 +258,83 @@ describe('McpService', () => {
 		});
 	});
 
-	describe('getServer', () => {
-		it('should create MCP server with registered tools', async () => {
-			const user = Object.assign(new User(), { id: 'user-1' });
+	describe('external tool registry', () => {
+		const user = Object.assign(new User(), { id: 'user-1' });
 
+		it('includes credential tools when builder mode is disabled', async () => {
+			const workflowBuilderToolsService = mockInstance(WorkflowBuilderToolsService);
+			const mcpService = createMcpService({
+				builderEnabled: false,
+				workflowBuilderToolsService,
+			});
+
+			await expect(mcpService.getExternalToolNames(user)).resolves.toEqual(
+				expect.arrayContaining(['search_credentials', 'get_credential_types']),
+			);
+			await expect(mcpService.getExternalToolNames(user)).resolves.not.toEqual(
+				expect.arrayContaining([
+					CODE_BUILDER_SEARCH_NODES_TOOL.toolName,
+					MCP_CREATE_WORKFLOW_FROM_CODE_TOOL.toolName,
+				]),
+			);
+			expect(workflowBuilderToolsService.initialize).not.toHaveBeenCalled();
+		});
+
+		it('includes builder and credential tools when builder mode is enabled', async () => {
+			const workflowBuilderToolsService = mockInstance(WorkflowBuilderToolsService);
+			const mcpService = createMcpService({
+				builderEnabled: true,
+				workflowBuilderToolsService,
+			});
+
+			await expect(mcpService.getExternalToolNames(user)).resolves.toEqual(
+				expect.arrayContaining([
+					'search_credentials',
+					'get_credential_types',
+					CODE_BUILDER_SEARCH_NODES_TOOL.toolName,
+					MCP_CREATE_WORKFLOW_FROM_CODE_TOOL.toolName,
+					MCP_GET_SDK_REFERENCE_TOOL.toolName,
+				]),
+			);
+			expect(workflowBuilderToolsService.initialize).toHaveBeenCalled();
+		});
+
+		it('creates an MCP server with registered tools', async () => {
+			const mcpService = createMcpService();
 			const server = await mcpService.getServer(user);
 
 			expect(server).toBeDefined();
-			// Verify server has expected MCP server methods
 			expect(typeof server.connect).toBe('function');
 			expect(typeof server.close).toBe('function');
 			expect(typeof server.registerTool).toBe('function');
 		});
+	});
 
-		it('should not register builder tools when mcpBuilderEnabled is false', async () => {
-			const user = Object.assign(new User(), { id: 'user-1' });
-			const workflowBuilderToolsService = mockInstance(WorkflowBuilderToolsService);
+	describe('versioning', () => {
+		const user = Object.assign(new User(), { id: 'user-1' });
 
-			const service = new McpService(
-				mockLogger(),
-				executionsConfig,
-				instanceSettings,
-				mockInstance(WorkflowFinderService),
-				mockInstance(WorkflowService),
-				mockInstance(UrlService),
-				mockInstance(CredentialsService),
-				activeExecutions,
-				mockInstance(GlobalConfig, {
-					endpoints: {
-						webhook: '/webhook',
-						webhookTest: '/webhook-test',
-						mcpBuilderEnabled: false,
-					},
-				}),
-				mockInstance(Telemetry),
-				mockInstance(WorkflowRunner),
-				mockInstance(RoleService),
-				mockInstance(ProjectService),
-				workflowBuilderToolsService,
-				mockInstance(WorkflowCreationService),
-				mockInstance(NodeTypes),
-				mockInstance(ProjectRepository),
-				mockInstance(FolderRepository),
-				mockInstance(SharedWorkflowRepository),
-				mockInstance(ExecutionRepository),
-				mockInstance(ExecutionService),
-				mockInstance(DataTableProxyService),
+		it('creates the same version for the same tool set regardless of order', () => {
+			expect(createExternalMcpVersion('2.16.0', ['b', 'a'])).toBe(
+				createExternalMcpVersion('2.16.0', ['a', 'b']),
 			);
-
-			const server = await service.getServer(user);
-			expect(server).toBeDefined();
-			// Builder tools service should NOT have been initialized
-			expect(workflowBuilderToolsService.initialize).not.toHaveBeenCalled();
 		});
 
-		it('should register builder tools when mcpBuilderEnabled is true', async () => {
-			const user = Object.assign(new User(), { id: 'user-1' });
-			const workflowBuilderToolsService = mockInstance(WorkflowBuilderToolsService);
-
-			const service = new McpService(
-				mockLogger(),
-				executionsConfig,
-				instanceSettings,
-				mockInstance(WorkflowFinderService),
-				mockInstance(WorkflowService),
-				mockInstance(UrlService),
-				mockInstance(CredentialsService),
-				activeExecutions,
-				mockInstance(GlobalConfig, {
-					endpoints: {
-						webhook: '/webhook',
-						webhookTest: '/webhook-test',
-						mcpBuilderEnabled: true,
-					},
-				}),
-				mockInstance(Telemetry),
-				mockInstance(WorkflowRunner),
-				mockInstance(RoleService),
-				mockInstance(ProjectService),
-				workflowBuilderToolsService,
-				mockInstance(WorkflowCreationService),
-				mockInstance(NodeTypes),
-				mockInstance(ProjectRepository),
-				mockInstance(FolderRepository),
-				mockInstance(SharedWorkflowRepository),
-				mockInstance(ExecutionRepository),
-				mockInstance(ExecutionService),
-				mockInstance(DataTableProxyService),
+		it('creates different versions when the tool set changes', () => {
+			expect(createExternalMcpVersion('2.16.0', ['a', 'b'])).not.toBe(
+				createExternalMcpVersion('2.16.0', ['a', 'b', 'c']),
 			);
+		});
 
-			const server = await service.getServer(user);
-			expect(server).toBeDefined();
-			// Builder tools service should have been initialized
-			expect(workflowBuilderToolsService.initialize).toHaveBeenCalled();
+		it('changes the advertised version when builder mode changes', async () => {
+			const disabledService = createMcpService({ builderEnabled: false });
+			const enabledService = createMcpService({ builderEnabled: true });
+
+			const disabledVersion = await disabledService.getAdvertisedMcpVersion(user);
+			const enabledVersion = await enabledService.getAdvertisedMcpVersion(user);
+
+			expect(disabledVersion).toMatch(new RegExp(`^${N8N_VERSION.replace('.', '\\.')}`));
+			expect(enabledVersion).toMatch(new RegExp(`^${N8N_VERSION.replace('.', '\\.')}`));
+			expect(disabledVersion).not.toBe(enabledVersion);
 		});
 	});
 });

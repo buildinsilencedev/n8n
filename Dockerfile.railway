@@ -1,0 +1,58 @@
+# syntax=docker/dockerfile:1.7
+
+ARG NODE_VERSION=24.14.1
+ARG N8N_VERSION=snapshot
+ARG N8N_RELEASE_TYPE=dev
+
+FROM node:${NODE_VERSION}-bookworm AS source-builder
+
+ENV CI=true \
+	N8N_SKIP_LICENSES=true
+
+RUN corepack enable
+
+WORKDIR /workspace
+
+COPY . .
+
+RUN pnpm install --frozen-lockfile && \
+	pnpm run build:deploy
+
+FROM node:${NODE_VERSION}-bookworm-slim
+
+ARG N8N_VERSION
+ARG N8N_RELEASE_TYPE
+
+ENV NODE_ENV=production \
+	N8N_RELEASE_TYPE=${N8N_RELEASE_TYPE} \
+	SHELL=/bin/sh
+
+WORKDIR /home/node
+
+RUN apt-get update && \
+	apt-get install -y --no-install-recommends tini ca-certificates openssl && \
+	rm -rf /var/lib/apt/lists/*
+
+COPY --from=source-builder /workspace/compiled /usr/local/lib/node_modules/n8n
+COPY docker/images/n8n/docker-entrypoint.sh /
+COPY scripts/n8n-postgres-admin.mjs /usr/local/lib/node_modules/n8n/tools/n8n-postgres-admin.mjs
+
+RUN ln -s /usr/local/lib/node_modules/n8n/bin/n8n /usr/local/bin/n8n && \
+	mkdir -p /home/node/.n8n && \
+	chmod +x /docker-entrypoint.sh && \
+	chmod +x /usr/local/lib/node_modules/n8n/tools/n8n-postgres-admin.mjs && \
+	printf '#!/bin/sh\nexec node /usr/local/lib/node_modules/n8n/tools/n8n-postgres-admin.mjs "$@"\n' > /usr/local/bin/n8n-postgres-admin && \
+	chmod +x /usr/local/bin/n8n-postgres-admin && \
+	chown -R node:node /home/node && \
+	rm -rf /root/.npm /tmp/*
+
+EXPOSE 5678/tcp
+
+USER root
+ENTRYPOINT ["tini", "--", "/docker-entrypoint.sh"]
+
+LABEL org.opencontainers.image.title="n8n-railway" \
+	org.opencontainers.image.description="Custom Railway deployment image for n8n" \
+	org.opencontainers.image.source="https://github.com/n8n-io/n8n" \
+	org.opencontainers.image.url="https://n8n.io" \
+	org.opencontainers.image.version=${N8N_VERSION}

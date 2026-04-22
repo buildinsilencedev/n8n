@@ -10,6 +10,8 @@ import type {
 	InstanceAiUserPreferencesUpdateRequest,
 	InstanceAiModelCredential,
 	InstanceAiPermissions,
+	InstanceAiSwarmBudgetMode,
+	InstanceAiSwarmMode,
 } from '@n8n/api-types';
 import { DEFAULT_INSTANCE_AI_PERMISSIONS } from '@n8n/api-types';
 import type { ModelConfig } from '@n8n/instance-ai';
@@ -53,8 +55,15 @@ const URL_FIELD_MAP: Record<string, string> = {
 
 /** Credential types for sandbox and search services. */
 const SANDBOX_CREDENTIAL_TYPES = ['daytonaApi', 'httpHeaderAuth'];
-const SEARCH_CREDENTIAL_TYPES = ['braveSearchApi', 'searXngApi'];
+const SEARCH_CREDENTIAL_TYPES = ['braveSearchApi', 'searXngApi', 'googleMapsApi', 'samGovApi'];
 const SERVICE_CREDENTIAL_TYPES = [...SANDBOX_CREDENTIAL_TYPES, ...SEARCH_CREDENTIAL_TYPES];
+
+type ResolvedSearchConfig =
+	| { provider: 'brave'; apiKey: string }
+	| { provider: 'searxng'; url: string }
+	| { provider: 'googleMaps'; apiKey: string }
+	| { provider: 'samGov'; apiKey: string }
+	| { provider: 'none' };
 
 /** Admin settings stored in DB under ADMIN_SETTINGS_KEY. */
 interface PersistedAdminSettings {
@@ -63,6 +72,11 @@ interface PersistedAdminSettings {
 	embedderModel?: string;
 	semanticRecallTopK?: number;
 	subAgentMaxSteps?: number;
+	swarmEnabled?: boolean;
+	swarmMaxWorkers?: number;
+	swarmBudgetMode?: InstanceAiSwarmBudgetMode;
+	swarmMaxEstimatedCostUsd?: number | null;
+	swarmMaxPromptTokens?: number | null;
 	browserMcp?: boolean;
 	permissions?: Partial<InstanceAiPermissions>;
 	mcpServers?: string;
@@ -80,6 +94,7 @@ interface PersistedAdminSettings {
 interface PersistedUserPreferences {
 	credentialId?: string | null;
 	modelName?: string;
+	swarmMode?: InstanceAiSwarmMode;
 	localGatewayDisabled?: boolean;
 }
 
@@ -139,6 +154,11 @@ export class InstanceAiSettingsService {
 			embedderModel: c.embedderModel,
 			semanticRecallTopK: c.semanticRecallTopK,
 			subAgentMaxSteps: c.subAgentMaxSteps,
+			swarmEnabled: c.swarmEnabled,
+			swarmMaxWorkers: c.swarmMaxWorkers,
+			swarmBudgetMode: c.swarmBudgetMode as InstanceAiSwarmBudgetMode,
+			swarmMaxEstimatedCostUsd: c.swarmMaxEstimatedCostUsd,
+			swarmMaxPromptTokens: c.swarmMaxPromptTokens,
 			browserMcp: c.browserMcp,
 			permissions: { ...this.permissions },
 			mcpServers: c.mcpServers,
@@ -165,6 +185,13 @@ export class InstanceAiSettingsService {
 		if (update.embedderModel !== undefined) c.embedderModel = update.embedderModel;
 		if (update.semanticRecallTopK !== undefined) c.semanticRecallTopK = update.semanticRecallTopK;
 		if (update.subAgentMaxSteps !== undefined) c.subAgentMaxSteps = update.subAgentMaxSteps;
+		if (update.swarmEnabled !== undefined) c.swarmEnabled = update.swarmEnabled;
+		if (update.swarmMaxWorkers !== undefined) c.swarmMaxWorkers = update.swarmMaxWorkers;
+		if (update.swarmBudgetMode !== undefined) c.swarmBudgetMode = update.swarmBudgetMode;
+		if (update.swarmMaxEstimatedCostUsd !== undefined)
+			c.swarmMaxEstimatedCostUsd = update.swarmMaxEstimatedCostUsd;
+		if (update.swarmMaxPromptTokens !== undefined)
+			c.swarmMaxPromptTokens = update.swarmMaxPromptTokens;
 		if (update.browserMcp !== undefined) c.browserMcp = update.browserMcp;
 		if (update.permissions) {
 			this.permissions = { ...this.permissions, ...update.permissions };
@@ -210,6 +237,7 @@ export class InstanceAiSettingsService {
 			credentialType,
 			credentialName,
 			modelName: prefs.modelName || this.extractModelName(this.config.model),
+			swarmMode: prefs.swarmMode ?? 'auto',
 			localGatewayDisabled:
 				this.config.localGatewayDisabled || (prefs.localGatewayDisabled ?? false),
 		};
@@ -228,11 +256,31 @@ export class InstanceAiSettingsService {
 		const prefs = await this.loadUserPreferences(user.id);
 		if (update.credentialId !== undefined) prefs.credentialId = update.credentialId;
 		if (update.modelName !== undefined) prefs.modelName = update.modelName;
+		if (update.swarmMode !== undefined) prefs.swarmMode = update.swarmMode;
 		if (update.localGatewayDisabled !== undefined)
 			prefs.localGatewayDisabled = update.localGatewayDisabled;
 		this.userPreferences.set(user.id, prefs);
 		await this.persistUserPreferences(user.id, prefs);
 		return await this.getUserPreferences(user);
+	}
+
+	async resolveSwarmSettings(user: User): Promise<{
+		enabled: boolean;
+		mode: InstanceAiSwarmMode;
+		maxWorkers: number;
+		budgetMode: InstanceAiSwarmBudgetMode;
+		maxEstimatedCostUsd: number | null;
+		maxPromptTokens: number | null;
+	}> {
+		const prefs = await this.loadUserPreferences(user.id);
+		return {
+			enabled: this.config.swarmEnabled,
+			mode: prefs.swarmMode ?? 'auto',
+			maxWorkers: this.config.swarmMaxWorkers,
+			budgetMode: this.config.swarmBudgetMode as InstanceAiSwarmBudgetMode,
+			maxEstimatedCostUsd: this.config.swarmMaxEstimatedCostUsd,
+			maxPromptTokens: this.config.swarmMaxPromptTokens,
+		};
 	}
 
 	// ── Shared accessors ──────────────────────────────────────────────────
@@ -327,15 +375,18 @@ export class InstanceAiSettingsService {
 	}
 
 	/** Resolve search config from the admin-selected credential. */
-	async resolveSearchConfig(user: User): Promise<{ braveApiKey?: string; searxngUrl?: string }> {
+	async resolveSearchConfig(user: User): Promise<ResolvedSearchConfig> {
 		const credentialId = this.adminSearchCredentialId;
 		if (!credentialId) {
 			// Fall back to env vars
 			const { braveSearchApiKey, searxngUrl } = this.config;
-			return {
-				braveApiKey: braveSearchApiKey || undefined,
-				searxngUrl: searxngUrl || undefined,
-			};
+			if (braveSearchApiKey) {
+				return { provider: 'brave', apiKey: braveSearchApiKey };
+			}
+			if (searxngUrl) {
+				return { provider: 'searxng', url: searxngUrl };
+			}
+			return { provider: 'none' };
 		}
 		const credential = await this.credentialsFinderService.findCredentialForUser(
 			credentialId,
@@ -343,16 +394,34 @@ export class InstanceAiSettingsService {
 			['credential:read'],
 		);
 		if (!credential) {
-			return {};
+			return { provider: 'none' };
 		}
 		const data = this.credentialsService.decrypt(credential, true);
 		if (credential.type === 'braveSearchApi') {
-			return { braveApiKey: typeof data.apiKey === 'string' ? data.apiKey : undefined };
+			return {
+				provider: 'brave',
+				apiKey: typeof data.apiKey === 'string' ? data.apiKey : '',
+			};
 		}
 		if (credential.type === 'searXngApi') {
-			return { searxngUrl: typeof data.apiUrl === 'string' ? data.apiUrl : undefined };
+			return {
+				provider: 'searxng',
+				url: typeof data.apiUrl === 'string' ? data.apiUrl : '',
+			};
 		}
-		return {};
+		if (credential.type === 'googleMapsApi') {
+			return {
+				provider: 'googleMaps',
+				apiKey: typeof data.apiKey === 'string' ? data.apiKey : '',
+			};
+		}
+		if (credential.type === 'samGovApi') {
+			return {
+				provider: 'samGov',
+				apiKey: typeof data.apiKey === 'string' ? data.apiKey : '',
+			};
+		}
+		return { provider: 'none' };
 	}
 
 	/** Return the current HITL permission map. */
@@ -486,6 +555,13 @@ export class InstanceAiSettingsService {
 		if (persisted.semanticRecallTopK !== undefined)
 			c.semanticRecallTopK = persisted.semanticRecallTopK;
 		if (persisted.subAgentMaxSteps !== undefined) c.subAgentMaxSteps = persisted.subAgentMaxSteps;
+		if (persisted.swarmEnabled !== undefined) c.swarmEnabled = persisted.swarmEnabled;
+		if (persisted.swarmMaxWorkers !== undefined) c.swarmMaxWorkers = persisted.swarmMaxWorkers;
+		if (persisted.swarmBudgetMode !== undefined) c.swarmBudgetMode = persisted.swarmBudgetMode;
+		if (persisted.swarmMaxEstimatedCostUsd !== undefined)
+			c.swarmMaxEstimatedCostUsd = persisted.swarmMaxEstimatedCostUsd;
+		if (persisted.swarmMaxPromptTokens !== undefined)
+			c.swarmMaxPromptTokens = persisted.swarmMaxPromptTokens;
 		if (persisted.browserMcp !== undefined) c.browserMcp = persisted.browserMcp;
 		if (persisted.permissions) {
 			this.permissions = {
@@ -530,6 +606,11 @@ export class InstanceAiSettingsService {
 			embedderModel: c.embedderModel,
 			semanticRecallTopK: c.semanticRecallTopK,
 			subAgentMaxSteps: c.subAgentMaxSteps,
+			swarmEnabled: c.swarmEnabled,
+			swarmMaxWorkers: c.swarmMaxWorkers,
+			swarmBudgetMode: c.swarmBudgetMode as InstanceAiSwarmBudgetMode,
+			swarmMaxEstimatedCostUsd: c.swarmMaxEstimatedCostUsd,
+			swarmMaxPromptTokens: c.swarmMaxPromptTokens,
 			browserMcp: c.browserMcp,
 			permissions: this.permissions,
 			mcpServers: c.mcpServers,

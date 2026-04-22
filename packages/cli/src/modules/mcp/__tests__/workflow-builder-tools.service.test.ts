@@ -1,6 +1,9 @@
 import type { Logger } from '@n8n/backend-common';
 import { Container } from '@n8n/di';
+import * as fs from 'fs/promises';
 import { mock } from 'jest-mock-extended';
+import os from 'os';
+import path from 'path';
 
 import { WorkflowBuilderToolsService } from '../tools/workflow-builder/workflow-builder-tools.service';
 
@@ -47,6 +50,14 @@ describe('WorkflowBuilderToolsService', () => {
 			collectTypes: jest.fn().mockResolvedValue({
 				nodes: [{ name: 'n8n-nodes-base.webhook' }, { name: 'n8n-nodes-base.set' }],
 			}),
+			loaders: {
+				'n8n-nodes-base': {
+					directory: path.dirname(require.resolve('n8n-nodes-base/package.json')),
+				},
+				'@n8n/n8n-nodes-langchain': {
+					directory: path.dirname(require.resolve('@n8n/n8n-nodes-langchain/package.json')),
+				},
+			},
 		});
 		Container.set(LoadNodesAndCredentials, loadNodesAndCredentials);
 
@@ -107,6 +118,24 @@ describe('WorkflowBuilderToolsService', () => {
 			for (const dir of dirs) {
 				expect(dir).toContain('node-definitions');
 			}
+		});
+
+		test('includes installed custom package node-definition directories from loaders', async () => {
+			const customPackageDir = await fs.mkdtemp(path.join(os.tmpdir(), 'n8n-custom-node-defs-'));
+			await fs.mkdir(path.join(customPackageDir, 'dist', 'node-definitions'), { recursive: true });
+
+			loadNodesAndCredentials.loaders = {
+				...loadNodesAndCredentials.loaders,
+				'n8n-nodes-community.example': {
+					directory: customPackageDir,
+				} as unknown as (typeof loadNodesAndCredentials.loaders)[string],
+			};
+
+			await service.initialize();
+
+			expect(service.getNodeDefinitionDirs()).toContain(
+				path.join(customPackageDir, 'dist', 'node-definitions'),
+			);
 		});
 	});
 

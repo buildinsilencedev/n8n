@@ -3,6 +3,7 @@ import {
 	ChatSessionId,
 	PROVIDER_CREDENTIAL_TYPE_MAP,
 	type ChatHubBaseLLMModel,
+	type ChatHubAgentWorkflowTemplateDto,
 	type ChatProviderSettingsDto,
 	type ChatHubAgentKnowledgeItem,
 } from '@n8n/api-types';
@@ -620,6 +621,107 @@ export class ChatHubWorkflowService {
 		return { nodes, connections, executionData };
 	}
 
+	buildAgentWorkflowTemplate(
+		agent: {
+			id: string;
+			name: string;
+			description: string | null;
+			systemPrompt: string;
+			credentialId: string | null;
+			provider: ChatHubBaseLLMModel['provider'];
+			model: string;
+			files: ChatHubAgentKnowledgeItem[];
+		},
+		tools: INode[],
+		vectorStoreSearch: { agentId: string; options: SemanticSearchOptions } | null,
+	): ChatHubAgentWorkflowTemplateDto {
+		if (!agent.credentialId) {
+			throw new BadRequestError('Credentials not set for agent');
+		}
+
+		const credentials: INodeCredentials = {
+			[PROVIDER_CREDENTIAL_TYPE_MAP[agent.provider]]: {
+				id: agent.credentialId,
+				name: '',
+			},
+		};
+
+		const systemMessage = this.buildWorkflowAgentSystemMessage({
+			name: agent.name,
+			description: agent.description,
+			systemPrompt: agent.systemPrompt,
+			files: agent.files,
+		});
+
+		const agentNode = this.buildWorkflowAgentNode(agent.name, {
+			provider: agent.provider,
+			model: agent.model,
+		}, systemMessage);
+		const modelNode = this.buildModelNode(credentials, {
+			provider: agent.provider,
+			model: agent.model,
+		});
+
+		const nodes: INode[] = [agentNode, modelNode];
+		const connections: ChatHubAgentWorkflowTemplateDto['connections'] = [
+			{
+				from: { nodeIndex: 1, outputIndex: 0, type: NodeConnectionTypes.AiLanguageModel },
+				to: { nodeIndex: 0, inputIndex: 0, type: NodeConnectionTypes.AiLanguageModel },
+			},
+		];
+
+		if (vectorStoreSearch) {
+			const [embeddingsNode, vectorStoreNode] = this.buildVectorStoreNodes(
+				vectorStoreSearch.agentId,
+				vectorStoreSearch.options,
+			);
+
+			const embeddingsNodeIndex = nodes.push(embeddingsNode) - 1;
+			const vectorStoreNodeIndex = nodes.push(vectorStoreNode) - 1;
+
+			connections.push(
+				{
+					from: {
+						nodeIndex: embeddingsNodeIndex,
+						outputIndex: 0,
+						type: NodeConnectionTypes.AiEmbedding,
+					},
+					to: {
+						nodeIndex: vectorStoreNodeIndex,
+						inputIndex: 0,
+						type: NodeConnectionTypes.AiEmbedding,
+					},
+				},
+				{
+					from: {
+						nodeIndex: vectorStoreNodeIndex,
+						outputIndex: 0,
+						type: NodeConnectionTypes.AiTool,
+					},
+					to: { nodeIndex: 0, inputIndex: 0, type: NodeConnectionTypes.AiTool },
+				},
+			);
+		}
+
+		const positionedTools = tools.map((tool, index) => ({
+			...tool,
+			position: [
+				400 + Math.floor(index / 3) * 80 + (index % 3) * 150,
+				-140 + Math.floor(index / 3) * 140 - (index % 3) * 30,
+			] as [number, number],
+		}));
+
+		for (const tool of positionedTools) {
+			const toolIndex = nodes.push(tool) - 1;
+			connections.push({
+				from: { nodeIndex: toolIndex, outputIndex: 0, type: NodeConnectionTypes.AiTool },
+				to: { nodeIndex: 0, inputIndex: 0, type: NodeConnectionTypes.AiTool },
+			});
+		}
+
+		return { nodes, connections };
+	}
+
 	private buildChatTriggerNode(): INode {
 		return {
 			parameters: {},
@@ -721,6 +823,22 @@ IMPORTANT:
 ${this.getSystemMessageMetadata(timeZone) + artifactContext}`;
 	}
 
+	private buildWorkflowAgentSystemMessage(agent: {
+		name: string;
+		description: string | null;
+		systemPrompt: string;
+		files: ChatHubAgentKnowledgeItem[];
+	}): string {
+		return [
+			`You are the "${agent.name}" AI agent inside an n8n workflow. Use the incoming item data, connected tools, and any linked knowledge to complete the assigned task.`,
+			agent.description?.trim() ? `## Role\n\n${agent.description.trim()}` : '',
+			this.buildCustomInstructionsContext(agent.systemPrompt),
+			this.buildFileKnowledgeContext(agent.files),
+		]
+			.filter((section) => section.trim().length > 0)
+			.join('\n\n');
+	}
+
 	private buildToolsAgentNode(
 		model: ChatHubConversationModel,
 		systemMessage: string,
@@ -744,6 +862,28 @@ ${this.getSystemMessageMetadata(timeZone) + artifactContext}`;
 			position: [608, 0],
 			id: uuidv4(),
 			name: NODE_NAMES.REPLY_AGENT,
+		};
+	}
+
+	private buildWorkflowAgentNode(
+		agentName: string,
+		model: ChatHubBaseLLMModel,
+		systemMessage: string,
+	): INode {
+		return {
+			parameters: {
+				promptType: 'define',
+				text: '={{ $json.chatInput ?? $json.input ?? $json.query ?? $json.prompt ?? $json.text ?? $json.message ?? "" }}',
+				options: {
+					systemMessage,
+					maxTokensFromMemory: getMaxContextWindowTokens(model.provider, model.model),
+				},
+			},
+			type: AGENT_LANGCHAIN_NODE_TYPE,
+			typeVersion: 3,
+			position: [0, 0],
+			id: uuidv4(),
+			name: agentName,
 		};
 	}
 

@@ -11,6 +11,7 @@ import {
 	type StickyNoteConfig,
 	type PlaceholderValue,
 	type NewCredentialValue,
+	type ExistingCredentialReference,
 	type DeclaredConnection,
 	type NodeChain,
 	type InputTarget,
@@ -1175,6 +1176,29 @@ class NewCredentialImpl implements NewCredentialValue {
  */
 export function newCredential(name: string, id?: string): NewCredentialValue {
 	return new NewCredentialImpl(name, id);
+}
+
+/**
+ * Link an existing credential discovered via MCP tooling.
+ *
+ * @param nameOrReference - Credential display name or an object containing the credential ID
+ * @param id - Credential ID when passing the name separately
+ */
+export function existingCredential(
+	nameOrReference: string | ExistingCredentialReference,
+	id?: string,
+): NewCredentialValue {
+	if (typeof nameOrReference === 'string') {
+		if (id === undefined) {
+			throw new Error(
+				"existingCredential() requires a credential ID. Use existingCredential('Name', 'cred-123') or existingCredential({ id: 'cred-123', name: 'Name' }).",
+			);
+		}
+
+		return new NewCredentialImpl(nameOrReference, id);
+	}
+
+	return new NewCredentialImpl(nameOrReference.name ?? nameOrReference.id, nameOrReference.id);
 }
 
 /**

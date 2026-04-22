@@ -167,6 +167,8 @@ function patchNodeInPlace(node: InstanceAiAgentNode, state: AgentRunState): bool
 	node.subtitle = agent.subtitle;
 	node.goal = agent.goal;
 	node.targetResource = agent.targetResource;
+	node.swarm = agent.swarm;
+	node.usage = agent.usage;
 
 	for (let i = 0; i < toolCallIds.length; i++) {
 		if (!isSafeObjectKey(toolCallIds[i])) return false;

@@ -145,7 +145,7 @@ describe('create-workflow-from-code MCP tool', () => {
 			expect(tool.config.annotations).toEqual(
 				expect.objectContaining({
 					readOnlyHint: false,
-					destructiveHint: false,
+					destructiveHint: true,
 					idempotentHint: false,
 					openWorldHint: false,
 				}),

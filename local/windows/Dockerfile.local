@@ -1,0 +1,39 @@
+ARG NODE_VERSION=24.14.1
+ARG PNPM_VERSION=10.32.1
+
+FROM node:${NODE_VERSION}-bookworm AS build
+
+ARG PNPM_VERSION
+
+ENV CI=true
+
+WORKDIR /app
+
+COPY . .
+
+RUN corepack enable \
+ && corepack prepare pnpm@${PNPM_VERSION} --activate \
+ && pnpm install --frozen-lockfile \
+ && pnpm build --summarize
+
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+
+ARG PNPM_VERSION
+
+ENV NODE_ENV=production
+ENV SHELL=/bin/bash
+
+WORKDIR /app
+
+COPY --from=build /app /app
+
+RUN corepack enable \
+ && corepack prepare pnpm@${PNPM_VERSION} --activate \
+ && mkdir -p /home/node/.n8n \
+ && chown -R node:node /app /home/node
+
+EXPOSE 5678
+
+USER node
+
+CMD ["node", "scripts/os-normalize.mjs", "--dir", "packages/cli/bin", "n8n", "start"]

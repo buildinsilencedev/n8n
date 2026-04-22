@@ -17,11 +17,11 @@ import type { Response } from 'express';
 import { OAuthClient } from './database/entities/oauth-client.entity';
 import { OAuthClientRepository } from './database/repositories/oauth-client.repository';
 import { UserConsentRepository } from './database/repositories/oauth-user-consent.repository';
+import { SUPPORTED_SCOPES } from './mcp-oauth.constants';
 import { McpOAuthAuthorizationCodeService } from './mcp-oauth-authorization-code.service';
 import { McpOAuthTokenService } from './mcp-oauth-token.service';
 import { OAuthSessionService } from './oauth-session.service';
-
-export const SUPPORTED_SCOPES = ['tool:listWorkflows', 'tool:getWorkflowDetails'];
+export { SUPPORTED_SCOPES } from './mcp-oauth.constants';
 
 /** Maximum number of redirect URIs per client */
 const MAX_REDIRECT_URIS = 10;
@@ -166,10 +166,7 @@ export class McpOAuthService implements OAuthServerProvider {
 			redirectUri,
 		);
 
-		const { accessToken, refreshToken } = this.tokenService.generateTokenPair(
-			authRecord.userId,
-			client.client_id,
-		);
+		const { accessToken, refreshToken } = this.tokenService.generateTokenPair(authRecord.userId, client.client_id);
 
 		await this.tokenService.saveTokenPair(
 			accessToken,
@@ -188,6 +185,7 @@ export class McpOAuthService implements OAuthServerProvider {
 			token_type: 'Bearer',
 			expires_in: 3600,
 			refresh_token: refreshToken,
+			scope: SUPPORTED_SCOPES.join(' '),
 		};
 	}
 

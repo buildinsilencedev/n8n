@@ -1,0 +1,12 @@
+2026/04/20-15:05:44.593 32f8 Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_mail.google.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/20-15:05:44.593 32f8 Recovering log #37
+2026/04/20-15:05:44.606 32f8 Reusing old log C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_mail.google.com_0.indexeddb.leveldb/000037.log 
+2026/04/20-15:05:45.579 32f4 Compacting 1@1 + 1@2 files
+2026/04/20-15:05:45.600 32f4 Generated table #40@1: 228 keys, 1123727 bytes
+2026/04/20-15:05:45.600 32f4 Compacted 1@1 + 1@2 files => 1123727 bytes
+2026/04/20-15:05:45.600 32f4 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/04/20-15:05:45.601 32f4 Delete type=2 #36
+2026/04/20-15:05:45.601 32f4 Delete type=2 #38
+2026/04/20-15:05:57.789 32f8 Level-0 table #42: started
+2026/04/20-15:05:57.811 32f8 Level-0 table #42: 3253952 bytes OK
+2026/04/20-15:05:57.812 32f8 Delete type=0 #37

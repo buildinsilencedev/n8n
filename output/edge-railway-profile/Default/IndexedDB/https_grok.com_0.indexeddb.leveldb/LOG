@@ -1,0 +1,6 @@
+2026/04/13-01:29:59.894 548 Creating DB C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_grok.com_0.indexeddb.leveldb since it was missing.
+2026/04/13-01:29:59.898 548 Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_grok.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/13-01:30:02.869 548 Level-0 table #5: started
+2026/04/13-01:30:02.872 548 Level-0 table #5: 1254 bytes OK
+2026/04/13-01:30:02.873 548 Delete type=0 #3
+2026/04/13-01:30:02.873 548 Manual compaction at level-0 from (begin) .. (end); will stop at (end)

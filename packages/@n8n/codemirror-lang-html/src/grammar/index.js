@@ -1,2 +1,2 @@
-export { parser } from './parser';
-export { configureNesting } from './content';
+export { parser } from './parser.js';
+export { configureNesting } from './content.js';

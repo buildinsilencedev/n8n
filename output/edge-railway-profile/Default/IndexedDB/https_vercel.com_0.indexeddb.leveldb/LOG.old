@@ -1,0 +1,4 @@
+2026/04/13-08:22:45.202 3594 Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_vercel.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/13-08:22:45.203 3594 Recovering log #18
+2026/04/13-08:22:45.205 3594 Reusing old log C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_vercel.com_0.indexeddb.leveldb/000018.log 
+2026/04/13-08:22:45.209 3560 Manual compaction at level-0 from '\x00\x0d\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0e\x00\x00\x00' @ 0 : 0; will stop at (end)

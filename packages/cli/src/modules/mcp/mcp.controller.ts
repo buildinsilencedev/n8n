@@ -1,6 +1,6 @@
 import { Logger } from '@n8n/backend-common';
 import { AuthenticatedRequest } from '@n8n/db';
-import { Head, Post, RootLevelController } from '@n8n/decorators';
+import { Head, Options, Post, RootLevelController } from '@n8n/decorators';
 import { Container } from '@n8n/di';
 import type { Request, Response } from 'express';
 import { ErrorReporter } from 'n8n-core';
@@ -14,6 +14,7 @@ import {
 	INTERNAL_SERVER_ERROR_MESSAGE,
 } from './mcp.constants';
 import { McpService } from './mcp.service';
+import { McpRequestLimiterService } from './mcp-request-limiter.service';
 import { McpSettingsService } from './mcp.settings.service';
 import { isJSONRPCRequest } from './mcp.typeguards';
 import type { UserConnectedToMCPEventPayload } from './mcp.types';
@@ -28,29 +29,63 @@ export class McpController {
 	constructor(
 		private readonly errorReporter: ErrorReporter,
 		private readonly mcpService: McpService,
+		private readonly mcpRequestLimiterService: McpRequestLimiterService,
 		private readonly mcpSettingsService: McpSettingsService,
 		private readonly telemetry: Telemetry,
 		private readonly logger: Logger,
 	) {}
 
-	// Add CORS headers helper
-	private setCorsHeaders(res: Response) {
-		// Allow requests from Claude AI playground and other MCP clients
-		res.header('Access-Control-Allow-Origin', '*');
-		res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+	private setCorsHeaders(req: Request, res: Response) {
+		const origin = req.header('origin');
+		if (!origin || !this.isAllowedCorsOrigin(origin)) {
+			return;
+		}
+
+		res.header('Vary', 'Origin');
+		res.header('Access-Control-Allow-Origin', origin);
+		res.header('Access-Control-Allow-Methods', 'POST, HEAD, OPTIONS');
 		res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-		res.header('Access-Control-Allow-Credentials', 'true');
-		res.header('Access-Control-Max-Age', '86400'); // 24 hours
+		res.header('Access-Control-Max-Age', '86400');
 	}
 
-	// // Handle OPTIONS preflight requests
-	// @Option('/http', {
-	// 	skipAuth: true,
-	// })
-	// async handlePreflight(req: AuthenticatedRequest, res: Response) {
-	// 	this.setCorsHeaders(res);
-	// 	res.status(204).send();
-	// }
+	private isAllowedCorsOrigin(origin: string): boolean {
+		try {
+			const parsedOrigin = new URL(origin);
+			return (
+				parsedOrigin.protocol === 'https:' ||
+				(parsedOrigin.protocol === 'http:' &&
+					['localhost', '127.0.0.1'].includes(parsedOrigin.hostname))
+			);
+		} catch {
+			return false;
+		}
+	}
+
+	private getRequestMetadata(body: unknown) {
+		if (Array.isArray(body)) {
+			return { isBatch: true, batchSize: body.length };
+		}
+
+		if (isJSONRPCRequest(body)) {
+			return {
+				isBatch: false,
+				method: body.method,
+				requestId: body.id ?? null,
+			};
+		}
+
+		return { isBatch: false, method: undefined, requestId: null };
+	}
+
+	@Options('/http', {
+		skipAuth: true,
+		usesTemplates: true,
+		ipRateLimit: { limit: 100 },
+	})
+	handlePreflight(req: Request, res: Response) {
+		this.setCorsHeaders(req, res);
+		res.status(204).end();
+	}
 
 	/**
 	 * HEAD endpoint for authentication scheme discovery
@@ -61,8 +96,8 @@ export class McpController {
 		skipAuth: true,
 		usesTemplates: true,
 	})
-	async discoverAuthSchemeHead(_req: Request, res: Response) {
-		this.setCorsHeaders(res);
+	async discoverAuthSchemeHead(req: Request, res: Response) {
+		this.setCorsHeaders(req, res);
 		res.header('WWW-Authenticate', 'Bearer realm="n8n MCP Server"');
 		res.status(401).end();
 	}
@@ -74,13 +109,19 @@ export class McpController {
 		usesTemplates: true,
 	})
 	async build(req: AuthenticatedRequest, res: FlushableResponse) {
-		// Set CORS headers for all responses
-		this.setCorsHeaders(res);
+		this.setCorsHeaders(req, res);
 
 		const body = req.body;
-		this.logger.debug('MCP Request', { body });
+		const requestMetadata = this.getRequestMetadata(body);
+		this.logger.debug('MCP request received', {
+			userId: req.user.id,
+			...requestMetadata,
+		});
 		const isInitializationRequest = isJSONRPCRequest(body) ? body.method === 'initialize' : false;
-		const isToolCallRequest = isJSONRPCRequest(body) ? body.method === 'toolCall' : false;
+		const isToolCallRequest =
+			isJSONRPCRequest(body) &&
+			typeof body.method === 'string' &&
+			['tools/call', 'toolCall'].includes(body.method);
 		const clientInfo = getClientInfo(req);
 
 		const telemetryPayload: Partial<UserConnectedToMCPEventPayload> = {
@@ -102,6 +143,24 @@ export class McpController {
 			}
 			// Return 403 Forbidden
 			res.status(403).json({ message: MCP_ACCESS_DISABLED_ERROR_MESSAGE });
+			return;
+		}
+
+		const rateLimitResult = this.mcpRequestLimiterService.acquire(req.user.id, isToolCallRequest);
+		if (!rateLimitResult.ok) {
+			this.logger.warn('Rejected MCP request because of rate limiting', {
+				userId: req.user.id,
+				reason: rateLimitResult.reason,
+				...requestMetadata,
+			});
+			res.status(429).json({
+				jsonrpc: '2.0',
+				error: {
+					code: -32001,
+					message: rateLimitResult.reason,
+				},
+				id: isJSONRPCRequest(body) ? body.id ?? null : null,
+			});
 			return;
 		}
 		// In stateless mode, create a new instance of transport and server for each request
@@ -126,8 +185,6 @@ export class McpController {
 					...telemetryPayload,
 					mcp_connection_status: 'success',
 				});
-			} else if (isToolCallRequest) {
-				this.logger.debug('MCP Tool Call request', body);
 			}
 		} catch (error) {
 			this.errorReporter.error(error);
@@ -149,6 +206,8 @@ export class McpController {
 					id: null,
 				});
 			}
+		} finally {
+			this.mcpRequestLimiterService.release(req.user.id);
 		}
 	}
 

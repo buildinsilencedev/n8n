@@ -7,6 +7,8 @@ import type {
 	TaskList,
 	InstanceAiAttachment,
 	InstanceAiPermissions,
+	InstanceAiSwarmBudgetMode,
+	InstanceAiSwarmMode,
 	McpTool,
 	McpToolCallRequest,
 	McpToolCallResult,
@@ -758,6 +760,15 @@ export interface WorkflowTaskService {
 	updateBuildOutcome(workItemId: string, update: Partial<WorkflowBuildOutcome>): Promise<void>;
 }
 
+export interface InstanceAiSwarmConfig {
+	enabled: boolean;
+	mode: InstanceAiSwarmMode;
+	maxWorkers: number;
+	budgetMode: InstanceAiSwarmBudgetMode;
+	maxEstimatedCostUsd: number | null;
+	maxPromptTokens: number | null;
+}
+
 // ── Orchestration context (plan + delegate tools) ───────────────────────────
 
 export interface OrchestrationContext {
@@ -772,6 +783,7 @@ export interface OrchestrationContext {
 	eventBus: InstanceAiEventBus;
 	logger: Logger;
 	domainTools: ToolsInput;
+	swarm?: InstanceAiSwarmConfig;
 	abortSignal: AbortSignal;
 	taskStorage: TaskStorage;
 	tracing?: InstanceAiTraceContext;

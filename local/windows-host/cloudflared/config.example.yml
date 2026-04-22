@@ -1,0 +1,8 @@
+tunnel: <your-tunnel-uuid>
+credentials-file: C:\Users\Shadow\.cloudflared\<your-tunnel-uuid>.json
+
+ingress:
+  - hostname: n8n-mcp.example.com
+    path: '^/(\.well-known/.*|mcp-server/.*|mcp-oauth/.*|oauth/consent.*|signin.*|rest/.*|assets/.*|favicon\.ico|.*\.(js|css|png|svg|ico|woff2?))$'
+    service: http://localhost:5678
+  - service: http_status:404

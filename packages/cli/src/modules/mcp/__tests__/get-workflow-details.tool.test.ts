@@ -87,12 +87,16 @@ describe('get-workflow-details MCP tool', () => {
 			);
 
 			expect('pinData' in payload.workflow).toBe(false);
-			expect(payload.workflow.nodes.every((n) => !('credentials' in n))).toBe(true);
+			expect(payload.workflow.nodes[0]).toMatchObject({
+				credentials: [{ id: 'cred-1', name: 'HeaderAuth', type: 'httpHeaderAuth' }],
+			});
 			expect(payload.triggerInfo).toContain('MOCK_TRIGGER_DETAILS');
 			expect(payload.workflow.versionId).toBe(workflow.versionId);
 			expect(payload.workflow.activeVersionId).toBe(workflow.activeVersionId);
 			expect(payload.workflow.activeVersion).not.toBeNull();
-			expect(payload.workflow.activeVersion?.nodes.every((n) => !('credentials' in n))).toBe(true);
+			expect(payload.workflow.activeVersion?.nodes[0]).toMatchObject({
+				credentials: [{ id: 'cred-1', name: 'HeaderAuth', type: 'httpHeaderAuth' }],
+			});
 			expect(payload.workflow.scopes).toEqual(['workflow:read', 'workflow:execute']);
 			expect(payload.workflow.canExecute).toBe(true);
 		});

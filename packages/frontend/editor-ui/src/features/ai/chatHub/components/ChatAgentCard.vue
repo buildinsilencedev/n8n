@@ -8,22 +8,34 @@ import type { ActionDropdownItem } from '@n8n/design-system/types';
 import { useI18n } from '@n8n/i18n';
 import { RouterLink } from 'vue-router';
 
-const { agent } = defineProps<{
+const { agent, canAddToWorkflow = false } = defineProps<{
 	agent: ChatModelDto;
+	canAddToWorkflow?: boolean;
 }>();
 
 const emit = defineEmits<{
 	edit: [];
 	delete: [];
+	'add-to-workflow': [];
 }>();
 
 const i18n = useI18n();
 
-type MenuAction = 'edit' | 'delete';
+type MenuAction = 'add-to-workflow' | 'edit' | 'delete';
 
 const menuItems = computed<Array<ActionDropdownItem<MenuAction>>>(() => {
 	return agent.model.provider === 'custom-agent'
-		? [{ id: 'delete' as const, label: i18n.baseText('chatHub.agent.card.menu.delete') }]
+		? [
+				...(canAddToWorkflow
+					? [
+							{
+								id: 'add-to-workflow' as const,
+								label: i18n.baseText('chatHub.agent.card.menu.addToWorkflow'),
+							},
+						]
+					: []),
+				{ id: 'delete' as const, label: i18n.baseText('chatHub.agent.card.menu.delete') },
+			]
 		: [];
 });
 
@@ -35,6 +47,9 @@ const canEdit = computed(
 
 function handleSelectMenu(action: MenuAction) {
 	switch (action) {
+		case 'add-to-workflow':
+			emit('add-to-workflow');
+			return;
 		case 'delete':
 			emit('delete');
 			return;

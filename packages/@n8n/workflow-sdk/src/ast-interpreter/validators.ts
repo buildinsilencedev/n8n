@@ -17,6 +17,7 @@ export const ALLOWED_SDK_FUNCTIONS = new Set([
 	'sticky',
 	'placeholder',
 	'newCredential',
+	'existingCredential',
 
 	// Control flow
 	'ifElse',

@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import { Config, Env } from '../decorators';
 
 @Config
@@ -41,6 +43,26 @@ export class InstanceAiConfig {
 	/** Maximum LLM reasoning steps for sub-agents spawned via delegate tool. */
 	@Env('N8N_INSTANCE_AI_SUB_AGENT_MAX_STEPS')
 	subAgentMaxSteps: number = 100;
+
+	/** Enable server-side swarm orchestration for complex Instance AI tasks. */
+	@Env('N8N_INSTANCE_AI_SWARM_ENABLED')
+	swarmEnabled: boolean = true;
+
+	/** Maximum number of parallel swarm workers. */
+	@Env('N8N_INSTANCE_AI_SWARM_MAX_WORKERS')
+	swarmMaxWorkers: number = 10;
+
+	/** Budgeting mode for swarm orchestration. */
+	@Env('N8N_INSTANCE_AI_SWARM_BUDGET_MODE')
+	swarmBudgetMode: string = 'soft_cap';
+
+	/** Soft cap for estimated swarm cost in USD. Empty = disabled. */
+	@Env('N8N_INSTANCE_AI_SWARM_MAX_ESTIMATED_COST_USD', z.coerce.number().nullable())
+	swarmMaxEstimatedCostUsd: number | null = null;
+
+	/** Soft cap for estimated swarm prompt tokens. Empty = disabled. */
+	@Env('N8N_INSTANCE_AI_SWARM_MAX_PROMPT_TOKENS', z.coerce.number().nullable())
+	swarmMaxPromptTokens: number | null = null;
 
 	/** Disable the local gateway (filesystem, shell, browser, etc.) for all users. */
 	@Env('N8N_INSTANCE_AI_LOCAL_GATEWAY_DISABLED')

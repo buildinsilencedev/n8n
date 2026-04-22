@@ -12,9 +12,11 @@ import type {
 	InstanceAiAgentNode,
 	InstanceAiAgentKind,
 	InstanceAiAgentStatus,
+	InstanceAiSwarmMetadata,
 	InstanceAiToolCallState,
 	InstanceAiTimelineEntry,
 	InstanceAiTargetResource,
+	InstanceAiUsageSummary,
 	PlannedTaskArg,
 	TaskList,
 } from './instance-ai.schema';
@@ -34,6 +36,7 @@ export interface AgentNode {
 	subtitle?: string;
 	goal?: string;
 	targetResource?: InstanceAiTargetResource;
+	swarm?: InstanceAiSwarmMetadata;
 	/** Transient status message (e.g. "Recalling conversation..."). Cleared when empty. */
 	statusMessage?: string;
 	status: InstanceAiAgentStatus;
@@ -43,6 +46,7 @@ export interface AgentNode {
 	planItems?: PlannedTaskArg[];
 	result?: string;
 	error?: string;
+	usage?: InstanceAiUsageSummary;
 }
 
 export interface AgentRunState {
@@ -269,6 +273,7 @@ export function reduceEvent(state: AgentRunState, event: InstanceAiEvent): Agent
 					subtitle: event.payload.subtitle,
 					goal: event.payload.goal,
 					targetResource: event.payload.targetResource,
+					swarm: event.payload.swarm,
 					status: 'active',
 					textContent: '',
 					reasoning: '',
@@ -292,6 +297,7 @@ export function reduceEvent(state: AgentRunState, event: InstanceAiEvent): Agent
 				agent.status = event.payload.error ? 'error' : 'completed';
 				agent.result = event.payload.result;
 				agent.error = event.payload.error;
+				agent.usage = event.payload.usage;
 			}
 			// A completed/errored agent can't have tool calls still in-flight.
 			// Clear isLoading so persisted snapshots don't show stale confirmations.
@@ -457,6 +463,7 @@ function buildNodeRecursive(state: AgentRunState, agentId: string): InstanceAiAg
 		subtitle: agent?.subtitle,
 		goal: agent?.goal,
 		targetResource: agent?.targetResource,
+		swarm: agent?.swarm,
 		statusMessage: agent?.statusMessage,
 		status: agent?.status ?? 'active',
 		textContent: agent?.textContent ?? '',
@@ -468,5 +475,6 @@ function buildNodeRecursive(state: AgentRunState, agentId: string): InstanceAiAg
 		planItems: agent?.planItems,
 		result: agent?.result,
 		error: agent?.error,
+		usage: agent?.usage,
 	};
 }

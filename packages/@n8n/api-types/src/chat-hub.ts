@@ -524,6 +524,21 @@ export interface ChatHubAgentDto {
 	updatedAt: string;
 }
 
+export interface ChatHubWorkflowTemplateConnectionEndpoint {
+	nodeIndex: number;
+	inputIndex?: number;
+	outputIndex?: number;
+	type?: string;
+}
+
+export interface ChatHubAgentWorkflowTemplateDto {
+	nodes: INode[];
+	connections: Array<{
+		from: ChatHubWorkflowTemplateConnectionEndpoint;
+		to: ChatHubWorkflowTemplateConnectionEndpoint;
+	}>;
+}
+
 export class ChatHubCreateAgentRequest extends Z.class({
 	name: z.string().min(1).max(128),
 	description: z.string().max(512).optional(),

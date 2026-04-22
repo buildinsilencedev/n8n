@@ -93,6 +93,8 @@ export type {
 	StreamRunOptions,
 	StreamRunResult,
 } from './runtime/stream-runner';
+export { runSwarmAgentRun } from './runtime/swarm-runner';
+export { shouldUseSwarm } from './runtime/swarm-utils';
 export {
 	createWorkItem,
 	formatWorkflowLoopGuidance,

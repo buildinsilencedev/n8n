@@ -430,6 +430,22 @@ export class ChatHubController {
 		return await this.chatAgentService.getAgentByIdAsDto(agentId, req.user.id);
 	}
 
+	@Get('/agents')
+	@GlobalScope('chatHubAgent:read')
+	async getAgents(req: AuthenticatedRequest) {
+		return await this.chatAgentService.getAgentsByUserIdAsDto(req.user.id);
+	}
+
+	@Get('/agents/:agentId/workflow-template')
+	@GlobalScope('chatHubAgent:read')
+	async getAgentWorkflowTemplate(
+		req: AuthenticatedRequest,
+		_res: Response,
+		@Param('agentId') agentId: string,
+	) {
+		return await this.chatAgentService.getAgentWorkflowTemplate(agentId, req.user);
+	}
+
 	@Post('/agents')
 	@GlobalScope('chatHubAgent:create')
 	async createAgent(

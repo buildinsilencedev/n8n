@@ -1,0 +1,7 @@
+2026/04/07-18:54:30.477 2f18 Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_www.youtube.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/07-18:54:30.477 2f18 Recovering log #3
+2026/04/07-18:54:30.480 2f18 Reusing old log C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_www.youtube.com_0.indexeddb.leveldb/000003.log 
+2026/04/07-18:55:04.784 2df4 Level-0 table #5: started
+2026/04/07-18:55:04.787 2df4 Level-0 table #5: 54520 bytes OK
+2026/04/07-18:55:04.788 2df4 Delete type=0 #3
+2026/04/07-18:55:04.788 2df4 Manual compaction at level-0 from (begin) .. (end); will stop at (end)

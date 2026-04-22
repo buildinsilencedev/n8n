@@ -12,6 +12,7 @@ import type { ChatHubExecutionService } from '../chat-hub-execution.service';
 import type { ChatHubSettingsService } from '../chat-hub.settings.service';
 import type { ChatHubToolService } from '../chat-hub-tool.service';
 import type { ChatHubWorkflowService } from '../chat-hub-workflow.service';
+import type { ChatHubAgentValidationService } from '../chat-hub-agent-validation.service';
 import type { ChatHubAgentKnowledgeItem } from '@n8n/api-types';
 import type { IRunExecutionData, IWorkflowBase } from 'n8n-workflow';
 import type { SemanticSearchOptions } from '../chat-hub.types';
@@ -79,6 +80,7 @@ describe('ChatHubAgentService', () => {
 	const settingsService = mock<ChatHubSettingsService>();
 	const dynamicNodeParametersService = mock<DynamicNodeParametersService>();
 	const toolService = mock<ChatHubToolService>();
+	const agentValidationService = mock<ChatHubAgentValidationService>();
 	const mockUser = mock<User>({ id: mockUserId });
 
 	let service: ChatHubAgentService;
@@ -98,6 +100,7 @@ describe('ChatHubAgentService', () => {
 			settingsService,
 			dynamicNodeParametersService,
 			toolService,
+			agentValidationService,
 		);
 	});
 
@@ -354,6 +357,46 @@ describe('ChatHubAgentService', () => {
 			expect(agentRepository.updateAgent).toHaveBeenCalledWith(
 				agent.id,
 				expect.not.objectContaining({ suggestedPrompts: expect.anything() }),
+			);
+		});
+	});
+
+	describe('getAgentWorkflowTemplate', () => {
+		it('builds a workflow template from the stored personal agent', async () => {
+			const agent = makeAgent({
+				files: [
+					{
+						id: 'file-1',
+						type: 'embedding',
+						provider: 'openai',
+						fileName: 'playbook.pdf',
+						mimeType: 'application/pdf',
+					},
+				],
+			} as Partial<ChatHubAgent>);
+			const toolDefinitions = [{ id: 'tool-1', name: 'Lookup CRM' } as any];
+			const template = {
+				nodes: [{ id: 'node-1', name: 'Planner', type: 'agent', typeVersion: 1, position: [0, 0] }],
+				connections: [],
+			};
+
+			agentRepository.getOneById.mockResolvedValue(agent);
+			toolService.getToolDefinitionsForAgent.mockResolvedValue(toolDefinitions);
+			settingsService.getSemanticSearchOptions.mockResolvedValue(MOCK_SEMANTIC_SEARCH_OPTIONS);
+			workflowService.buildAgentWorkflowTemplate.mockReturnValue(template as any);
+
+			await expect(service.getAgentWorkflowTemplate(agent.id, mockUser)).resolves.toEqual(template);
+
+			expect(agentRepository.getOneById).toHaveBeenCalledWith(agent.id, mockUser.id, undefined);
+			expect(toolService.getToolDefinitionsForAgent).toHaveBeenCalledWith(agent.id);
+			expect(settingsService.getSemanticSearchOptions).toHaveBeenCalled();
+			expect(workflowService.buildAgentWorkflowTemplate).toHaveBeenCalledWith(
+				agent,
+				toolDefinitions,
+				{
+					agentId: agent.id,
+					options: MOCK_SEMANTIC_SEARCH_OPTIONS,
+				},
 			);
 		});
 	});

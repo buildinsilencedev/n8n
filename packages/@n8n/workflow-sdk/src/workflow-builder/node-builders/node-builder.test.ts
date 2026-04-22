@@ -6,6 +6,7 @@ import {
 	sticky,
 	placeholder,
 	newCredential,
+	existingCredential,
 	merge,
 	ifElse,
 	switchCase,
@@ -391,6 +392,25 @@ describe('Node Builder', () => {
 		it('should serialize to { id, name } when id is provided', () => {
 			const c = newCredential('Slack Bot', 'cred-123');
 			expect(JSON.stringify({ cred: c })).toBe('{"cred":{"id":"cred-123","name":"Slack Bot"}}');
+		});
+
+		it('should create an explicit existing credential reference from a name and id', () => {
+			const c = existingCredential('Slack Bot', 'cred-123');
+			expect(c.__newCredential).toBe(true);
+			expect(c.name).toBe('Slack Bot');
+			expect(c.id).toBe('cred-123');
+			expect(JSON.stringify({ cred: c })).toBe('{"cred":{"id":"cred-123","name":"Slack Bot"}}');
+		});
+
+		it('should create an explicit existing credential reference from an object', () => {
+			const c = existingCredential({ id: 'cred-789', name: 'Google Maps' });
+			expect(c.__newCredential).toBe(true);
+			expect(c.name).toBe('Google Maps');
+			expect(c.id).toBe('cred-789');
+		});
+
+		it('should require an id when existingCredential is called with a string name', () => {
+			expect(() => existingCredential('Slack Bot')).toThrow('requires a credential ID');
 		});
 
 		it('should work in node credentials config (placeholder, no id)', () => {

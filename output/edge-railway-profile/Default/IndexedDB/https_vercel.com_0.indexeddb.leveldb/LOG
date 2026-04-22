@@ -1,0 +1,16 @@
+2026/04/15-08:46:08.393 333c Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_vercel.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/15-08:46:08.394 333c Recovering log #18
+2026/04/15-08:46:08.398 333c Reusing old log C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_vercel.com_0.indexeddb.leveldb/000018.log 
+2026/04/15-08:46:08.400 3350 Manual compaction at level-0 from '\x00\x0e\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x0f\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/04/15-08:46:38.796 3344 Level-0 table #23: started
+2026/04/15-08:46:38.797 3344 Level-0 table #23: 18027 bytes OK
+2026/04/15-08:46:38.798 3344 Delete type=0 #18
+2026/04/15-08:46:38.798 3344 Manual compaction at level-0 from (begin) .. (end); will stop at (end)
+2026/04/15-08:46:38.799 3344 Manual compaction at level-1 from (begin) .. (end); will stop at '\x00\x0f\x00\x00\xc8\x06\x00S\x00c\x00o\x00p\x00e\x00s' @ 3644 : 1
+2026/04/15-08:46:38.799 3344 Compacting 1@1 + 1@2 files
+2026/04/15-08:46:38.800 3344 Generated table #24@1: 60 keys, 997 bytes
+2026/04/15-08:46:38.800 3344 Compacted 1@1 + 1@2 files => 997 bytes
+2026/04/15-08:46:38.800 3344 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/04/15-08:46:38.801 3344 Delete type=2 #20
+2026/04/15-08:46:38.801 3344 Delete type=2 #23
+2026/04/15-08:46:38.801 3344 Manual compaction at level-1 from '\x00\x0f\x00\x00\xc8\x06\x00S\x00c\x00o\x00p\x00e\x00s' @ 3644 : 1 .. (end); will stop at (end)

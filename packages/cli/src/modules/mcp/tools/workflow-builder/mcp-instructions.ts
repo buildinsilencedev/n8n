@@ -26,13 +26,18 @@ To build n8n workflows, follow these steps in order:
 
 1. Read the SDK reference: Call ${MCP_GET_SDK_REFERENCE_TOOL.toolName} (or use the n8n://workflow-sdk/reference resource) to learn the SDK patterns and syntax.
 
-2. Discover nodes: Call ${CODE_BUILDER_SEARCH_NODES_TOOL.toolName} with queries for services you need (e.g., ["gmail", "slack", "schedule trigger"]) and utility nodes (e.g., ["set", "if", "merge", "code"]). Note the discriminators (resource/operation/mode) in the results.
+2. Discover nodes: Call ${CODE_BUILDER_SEARCH_NODES_TOOL.toolName} with queries for services you need (e.g., ["gmail", "slack", "schedule trigger"]) and utility nodes (e.g., ["set", "if", "merge", "code"]). Note the discriminators (resource/operation/mode) in the results. Installed community/custom nodes on the current instance are included when available.
 
 3. (Optional) Get suggestions: Call ${CODE_BUILDER_GET_SUGGESTED_NODES_TOOL.toolName} with workflow technique categories for curated recommendations.
 
 4. Get type definitions: Call ${CODE_BUILDER_GET_NODE_TYPES_TOOL.toolName} with ALL node IDs you plan to use, including discriminators from search results. This returns the exact TypeScript parameter definitions. DO NOT skip this — guessing parameter names creates invalid workflows.
 
 5. Write the workflow code using the SDK patterns from the reference and the exact parameter names from the type definitions. Follow the coding guidelines and design guidance sections of the SDK reference (retrieve them with ${MCP_GET_SDK_REFERENCE_TOOL.toolName} using sections "guidelines" and "design").
+
+Credential discovery:
+- Call search_credentials to find safe metadata for existing credentials you can use.
+- Call get_credential_types to discover installed credential types such as googleMapsApi or samGovApi.
+- To link an existing credential in SDK code, use existingCredential('Credential Name', 'cred-123').
 
 6. Validate: Call ${CODE_BUILDER_VALIDATE_TOOL.toolName} with your full code. Fix any errors and re-validate until valid.
 

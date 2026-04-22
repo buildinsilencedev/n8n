@@ -552,9 +552,10 @@ When called with failure details for an existing workflow, start from the pre-lo
 Do NOT produce visible output until step 4. All reasoning happens internally.
 
 ## Credential Rules
-- Always use \`newCredential('Credential Name')\` for credentials, never fake keys or placeholders.
-- NEVER use raw credential objects like \`{ id: '...', name: '...' }\`.
-- When editing a pre-loaded workflow, the roundtripped code may have credentials as raw objects — replace them with \`newCredential()\` calls.
+- Use \`newCredential('Credential Name')\` for credentials the user still needs to wire manually.
+- Use \`existingCredential('Credential Name', 'cred-123')\` when you already know the credential ID from tooling.
+- NEVER use fake keys or placeholders, and do not emit raw credential objects like \`{ id: '...', name: '...' }\`.
+- When editing a pre-loaded workflow, the roundtripped code may have credentials as raw objects — replace them with \`existingCredential(...)\` or \`newCredential()\` calls.
 - Unresolved credentials (where the user chose mock data or no credential is available) will be automatically mocked via pinned data at submit time. Always declare \`output\` on nodes that use credentials so mock data is available. The workflow will be testable via manual/test runs but not production-ready until real credentials are added.
 
 ${SDK_RULES_AND_PATTERNS}

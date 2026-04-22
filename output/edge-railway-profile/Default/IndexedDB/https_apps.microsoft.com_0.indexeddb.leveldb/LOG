@@ -1,0 +1,6 @@
+2026/03/31-18:58:52.338 2dac Creating DB C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_apps.microsoft.com_0.indexeddb.leveldb since it was missing.
+2026/03/31-18:58:52.341 2dac Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_apps.microsoft.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/03/31-18:59:24.379 2dac Level-0 table #5: started
+2026/03/31-18:59:24.381 2dac Level-0 table #5: 1880 bytes OK
+2026/03/31-18:59:24.382 2dac Delete type=0 #3
+2026/03/31-18:59:24.382 2dac Manual compaction at level-0 from (begin) .. (end); will stop at (end)

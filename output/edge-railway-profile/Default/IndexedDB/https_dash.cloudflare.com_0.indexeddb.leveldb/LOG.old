@@ -1,0 +1,15 @@
+2026/04/19-22:22:39.327 1c6c Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_dash.cloudflare.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/19-22:22:39.328 1c6c Recovering log #7
+2026/04/19-22:22:39.329 1c6c Reusing old log C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_dash.cloudflare.com_0.indexeddb.leveldb/000007.log 
+2026/04/19-22:25:36.210 3060 Level-0 table #12: started
+2026/04/19-22:25:36.211 3060 Level-0 table #12: 1073 bytes OK
+2026/04/19-22:25:36.212 3060 Delete type=0 #7
+2026/04/19-22:25:36.213 3060 Manual compaction at level-0 from (begin) .. (end); will stop at (end)
+2026/04/19-22:25:36.213 3060 Manual compaction at level-1 from (begin) .. (end); will stop at '\x00\x01\x01\x02\x01$\x00f\x003\x005\x003\x001\x000\x007\x00e\x00-\x008\x00b\x005\x00c\x00-\x004\x005\x00e\x00a\x00-\x008\x006\x00d\x008\x00-\x00f\x00c\x006\x004\x00e\x00a\x001\x007\x005\x00c\x00f\x00c' @ 255 : 1
+2026/04/19-22:25:36.213 3060 Compacting 1@1 + 1@2 files
+2026/04/19-22:25:36.214 3060 Generated table #13@1: 21 keys, 689 bytes
+2026/04/19-22:25:36.214 3060 Compacted 1@1 + 1@2 files => 689 bytes
+2026/04/19-22:25:36.215 3060 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/04/19-22:25:36.215 3060 Delete type=2 #9
+2026/04/19-22:25:36.215 3060 Delete type=2 #12
+2026/04/19-22:25:36.216 3060 Manual compaction at level-1 from '\x00\x01\x01\x02\x01$\x00f\x003\x005\x003\x001\x000\x007\x00e\x00-\x008\x00b\x005\x00c\x00-\x004\x005\x00e\x00a\x00-\x008\x006\x00d\x008\x00-\x00f\x00c\x006\x004\x00e\x00a\x001\x007\x005\x00c\x00f\x00c' @ 255 : 1 .. (end); will stop at (end)

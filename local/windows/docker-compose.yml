@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-n8n-local}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  n8n:
+    image: ${N8N_IMAGE_NAME:-n8n-local:workspace}
+    container_name: ${COMPOSE_PROJECT_NAME:-n8n-local}-app
+    restart: unless-stopped
+    build:
+      context: ../..
+      dockerfile: local/windows/Dockerfile.local
+      args:
+        NODE_VERSION: ${NODE_VERSION:-24.14.1}
+        PNPM_VERSION: ${PNPM_VERSION:-10.32.1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_LISTEN_ADDRESS: 0.0.0.0
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      N8N_EDITOR_BASE_URL: ${INSTANCE_BASE_URL}
+      WEBHOOK_URL: ${INSTANCE_BASE_URL}/
+      N8N_MCP_BUILDER_ENABLED: ${N8N_MCP_BUILDER_ENABLED}
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE}
+      N8N_LOG_LEVEL: ${N8N_LOG_LEVEL}
+      N8N_DIAGNOSTICS_ENABLED: ${N8N_DIAGNOSTICS_ENABLED}
+      N8N_VERSION_NOTIFICATIONS_ENABLED: ${N8N_VERSION_NOTIFICATIONS_ENABLED}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE}
+      TZ: ${TZ}
+    ports:
+      - '5678:5678'
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-n8n-local}-cloudflared
+    profiles:
+      - public
+    restart: unless-stopped
+    depends_on:
+      - n8n
+    command: ['tunnel', '--config', '/etc/cloudflared/config.yml', 'run']
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+
+volumes:
+  n8n_data:
+  postgres_data:

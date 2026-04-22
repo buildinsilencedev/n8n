@@ -1,0 +1,19 @@
+{
+	"node": "n8n-nodes-base.composio",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Developer Tools"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://docs.composio.dev/reference/authentication"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://docs.composio.dev/reference"
+			}
+		]
+	},
+	"alias": ["AI tools", "toolkit auth", "managed auth"]
+}

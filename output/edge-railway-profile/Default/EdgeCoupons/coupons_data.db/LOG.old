@@ -1,0 +1,5 @@
+2026/04/21-21:39:09.905 19a0 Creating DB C:\Users\Shadow\Documents\GitHub\n8n\output\edge-railway-profile\Default\EdgeCoupons/coupons_data.db since it was missing.
+2026/04/21-21:39:09.952 19a0 Reusing MANIFEST C:\Users\Shadow\Documents\GitHub\n8n\output\edge-railway-profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/04/21-21:39:10.344 3968 Level-0 table #5: started
+2026/04/21-21:39:10.348 3968 Level-0 table #5: 682121 bytes OK
+2026/04/21-21:39:10.349 3968 Delete type=0 #3

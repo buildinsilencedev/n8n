@@ -63,3 +63,14 @@ packages/cli/src/commands/export/outputs
 .n8n
 lefthook-local.yml
 .playwright-mcp
+local/windows/.env
+local/windows/cloudflared/config.yml
+local/windows/cloudflared/*.json
+local/windows-host/.env
+local/windows-host/n8n.pid
+local/windows-host/cloudflared.pid
+local/windows-host/logs/
+local/windows-host/data/
+local/windows-host/cloudflared/config.yml
+local/windows-host/cloudflared/*.json
+local/railway/.env

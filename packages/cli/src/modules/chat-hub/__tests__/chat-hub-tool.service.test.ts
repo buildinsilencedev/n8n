@@ -8,6 +8,7 @@ import { v4 as uuid } from 'uuid';
 import type { ChatHubTool } from '../chat-hub-tool.entity';
 import type { ChatHubToolRepository } from '../chat-hub-tool.repository';
 import { ChatHubToolService } from '../chat-hub-tool.service';
+import type { ChatHubAgentValidationService } from '../chat-hub-agent-validation.service';
 
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
 import { NotFoundError } from '@/errors/response-errors/not-found.error';
@@ -52,6 +53,7 @@ describe('ChatHubToolService', () => {
 
 	const chatToolRepository = mock<ChatHubToolRepository>();
 	const nodeTypes = mock<NodeTypes>();
+	const agentValidationService = mock<ChatHubAgentValidationService>();
 	const mockUser = mock<User>({ id: mockUserId });
 	const mockManager = mock<EntityManager>();
 
@@ -71,7 +73,12 @@ describe('ChatHubToolService', () => {
 			description: { properties: [] },
 		} as unknown as INodeType);
 
-		service = new ChatHubToolService(logger, chatToolRepository, nodeTypes);
+		service = new ChatHubToolService(
+			logger,
+			chatToolRepository,
+			nodeTypes,
+			agentValidationService,
+		);
 	});
 
 	describe('getToolsByUserId', () => {

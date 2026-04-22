@@ -14,6 +14,7 @@ import type {
 	ChatSessionId,
 	ChatMessageId,
 	ChatHubAgentDto,
+	ChatHubAgentWorkflowTemplateDto,
 	ChatHubCreateAgentRequest,
 	ChatHubUpdateAgentRequest,
 	ChatHubUpdateConversationRequest,
@@ -243,6 +244,14 @@ export const fetchAgentApi = async (
 ): Promise<ChatHubAgentDto> => {
 	const apiEndpoint = `/chat/agents/${agentId}`;
 	return await makeRestApiRequest<ChatHubAgentDto>(context, 'GET', apiEndpoint);
+};
+
+export const fetchAgentWorkflowTemplateApi = async (
+	context: IRestApiContext,
+	agentId: string,
+): Promise<ChatHubAgentWorkflowTemplateDto> => {
+	const apiEndpoint = `/chat/agents/${agentId}/workflow-template`;
+	return await makeRestApiRequest<ChatHubAgentWorkflowTemplateDto>(context, 'GET', apiEndpoint);
 };
 
 export const createAgentApi = async (

@@ -1,0 +1,6 @@
+2026/04/13-08:38:02.525 3560 Creating DB C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_fiscal.ai_0.indexeddb.leveldb since it was missing.
+2026/04/13-08:38:02.529 3560 Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_fiscal.ai_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/13-08:38:02.552 3568 Level-0 table #5: started
+2026/04/13-08:38:02.553 3568 Level-0 table #5: 1262 bytes OK
+2026/04/13-08:38:02.554 3568 Delete type=0 #3
+2026/04/13-08:38:02.554 3554 Manual compaction at level-0 from '\x00\x01\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x02\x00\x00\x00' @ 0 : 0; will stop at (end)

@@ -17,6 +17,7 @@ mcpServerMiddlewareService.getAuthMiddleware.mockReturnValue(mockAuthMiddleware)
 Container.set(McpServerMiddlewareService, mcpServerMiddlewareService);
 
 import { McpController, type FlushableResponse } from '../mcp.controller';
+import { McpRequestLimiterService } from '../mcp-request-limiter.service';
 import { McpService } from '../mcp.service';
 import { McpSettingsService } from '../mcp.settings.service';
 
@@ -29,7 +30,12 @@ jest.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => {
 });
 
 const createReq = (overrides: Partial<AuthenticatedRequest> = {}): AuthenticatedRequest =>
-	({ user: { id: 'user-1' }, body: {}, ...overrides }) as unknown as AuthenticatedRequest;
+	({
+		user: { id: 'user-1' },
+		body: {},
+		header: jest.fn().mockReturnValue(undefined),
+		...overrides,
+	}) as unknown as AuthenticatedRequest;
 
 const createRes = (): FlushableResponse => {
 	const res = mock<FlushableResponse>();
@@ -42,6 +48,7 @@ describe('McpController', () => {
 	let controller: McpController;
 	const logger = mock<Logger>();
 	const mcpService = { getServer: jest.fn() } as unknown as McpService;
+	const mcpRequestLimiterService = { acquire: jest.fn(), release: jest.fn() } as unknown as McpRequestLimiterService;
 	const mcpSettingsService = { getEnabled: jest.fn() } as unknown as McpSettingsService;
 
 	beforeEach(() => {
@@ -49,9 +56,11 @@ describe('McpController', () => {
 
 		Container.set(Logger, logger);
 		Container.set(McpService, mcpService);
+		Container.set(McpRequestLimiterService, mcpRequestLimiterService);
 		Container.set(McpSettingsService, mcpSettingsService);
 
 		controller = Container.get(McpController);
+		(mcpRequestLimiterService.acquire as jest.Mock).mockReturnValue({ ok: true });
 	});
 
 	test('returns 403 if MCP access is disabled', async () => {
@@ -75,7 +84,7 @@ describe('McpController', () => {
 	});
 
 	test('HEAD /http returns 401 with WWW-Authenticate header for auth scheme discovery', async () => {
-		const req = {} as Request;
+		const req = { header: jest.fn().mockReturnValue(undefined) } as unknown as Request;
 		const res = createRes();
 		res.header = jest.fn().mockReturnThis();
 		res.end = jest.fn().mockReturnThis();
@@ -85,5 +94,32 @@ describe('McpController', () => {
 		expect(res.header).toHaveBeenCalledWith('WWW-Authenticate', 'Bearer realm="n8n MCP Server"');
 		expect(res.status).toHaveBeenCalledWith(401);
 		expect(res.end).toHaveBeenCalled();
+	});
+
+	test('returns 429 when the MCP rate limiter rejects the request', async () => {
+		(mcpSettingsService.getEnabled as jest.Mock).mockResolvedValue(true);
+		(mcpRequestLimiterService.acquire as jest.Mock).mockReturnValue({
+			ok: false,
+			reason: 'MCP request rate limit exceeded for this user',
+		});
+
+		const res = createRes();
+		await controller.build(
+			createReq({
+				body: { jsonrpc: '2.0', id: 'req-1', method: 'initialize', params: {} },
+			}),
+			res,
+		);
+
+		expect(res.status).toHaveBeenCalledWith(429);
+		expect(res.json).toHaveBeenCalledWith({
+			jsonrpc: '2.0',
+			error: {
+				code: -32001,
+				message: 'MCP request rate limit exceeded for this user',
+			},
+			id: 'req-1',
+		});
+		expect(mcpService.getServer as unknown as jest.Mock).not.toHaveBeenCalled();
 	});
 });

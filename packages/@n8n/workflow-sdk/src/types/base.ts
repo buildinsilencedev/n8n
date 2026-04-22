@@ -66,6 +66,14 @@ export interface CredentialReference {
 }
 
 /**
+ * Explicit selector for an existing credential returned by tooling.
+ */
+export interface ExistingCredentialReference {
+	id: string;
+	name?: string;
+}
+
+/**
  * Marker for new credentials that need to be created.
  */
 export interface NewCredentialValue {
@@ -1078,6 +1086,11 @@ export type StickyFn = (
 export type PlaceholderFn = (hint: string) => PlaceholderValue;
 
 export type NewCredentialFn = (name: string, id?: string) => NewCredentialValue;
+
+export type ExistingCredentialFn = (
+	nameOrReference: string | ExistingCredentialReference,
+	id?: string,
+) => NewCredentialValue;
 
 export type IfElseFn = (
 	branches: [

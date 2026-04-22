@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { N8nHeading, N8nInput, N8nSelect, N8nOption, N8nInputLabel } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
+import type { BaseTextKey } from '@n8n/i18n';
 import { useSettingsField } from './useSettingsField';
 
 const i18n = useI18n();
@@ -16,6 +17,8 @@ const selectedCredentialId = computed(() => {
 function handleCredentialChange(value: string | number | boolean | null) {
 	store.setPreferenceField('credentialId', value ? String(value) : null);
 }
+
+const selectedSwarmMode = computed(() => getPreferenceString('swarmMode') || 'auto');
 </script>
 
 <template>
@@ -56,6 +59,29 @@ function handleCredentialChange(value: string | number | boolean | null) {
 				:placeholder="i18n.baseText('instanceAi.settings.modelName.placeholder')"
 				@update:model-value="store.setPreferenceField('modelName', $event)"
 			/>
+		</N8nInputLabel>
+
+		<N8nInputLabel
+			:label="i18n.baseText('instanceAi.settings.swarmMode.label' as BaseTextKey)"
+			:bold="false"
+			size="small"
+		>
+			<N8nSelect
+				:model-value="selectedSwarmMode"
+				size="small"
+				@update:model-value="
+					store.setPreferenceField('swarmMode', ($event || 'auto') as 'auto' | 'off')
+				"
+			>
+				<N8nOption
+					value="auto"
+					:label="i18n.baseText('instanceAi.settings.swarmMode.auto' as BaseTextKey)"
+				/>
+				<N8nOption
+					value="off"
+					:label="i18n.baseText('instanceAi.settings.swarmMode.off' as BaseTextKey)"
+				/>
+			</N8nSelect>
 		</N8nInputLabel>
 	</div>
 </template>

@@ -13,6 +13,7 @@ import { RefreshToken } from './database/entities/oauth-refresh-token.entity';
 import { AccessTokenRepository } from './database/repositories/oauth-access-token.repository';
 import { RefreshTokenRepository } from './database/repositories/oauth-refresh-token.repository';
 import { AccessTokenNotFoundError, JWTVerificationError } from './mcp.errors';
+import { SUPPORTED_SCOPES } from './mcp-oauth.constants';
 import { UserWithContext } from './mcp.types';
 
 import { JwtService } from '@/services/jwt.service';
@@ -38,11 +39,13 @@ export class McpOAuthTokenService {
 	generateTokenPair(
 		userId: string,
 		clientId: string,
+		scopes: string[] = SUPPORTED_SCOPES,
 	): { accessToken: string; refreshToken: string } {
 		const accessToken = this.jwtService.sign({
 			sub: userId,
 			aud: this.MCP_AUDIENCE,
 			client_id: clientId,
+			scope: scopes.join(' '),
 			jti: randomUUID(),
 			iat: Math.floor(Date.now() / 1000),
 			exp: Math.floor(Date.now() / 1000) + this.ACCESS_TOKEN_EXPIRY_SECONDS,
@@ -135,12 +138,18 @@ export class McpOAuthTokenService {
 				token_type: 'Bearer',
 				expires_in: this.ACCESS_TOKEN_EXPIRY_SECONDS,
 				refresh_token: newRefreshToken,
+				scope: SUPPORTED_SCOPES.join(' '),
 			};
 		});
 	}
 
 	async verifyAccessToken(token: string): Promise<AuthInfo> {
-		let decoded;
+		let decoded: {
+			client_id: string;
+			sub: string;
+			scope?: string;
+			meta?: { isOAuth?: boolean };
+		};
 
 		try {
 			decoded = this.jwtService.verify(token, { audience: this.MCP_AUDIENCE });
@@ -156,10 +165,17 @@ export class McpOAuthTokenService {
 			throw new AccessTokenNotFoundError();
 		}
 
+		const scopes =
+			typeof decoded.scope === 'string' && decoded.scope.trim().length > 0
+				? decoded.scope.split(/\s+/)
+				: decoded.meta?.isOAuth === true
+					? SUPPORTED_SCOPES
+					: [];
+
 		return {
 			token,
 			clientId: decoded.client_id,
-			scopes: [],
+			scopes,
 			extra: {
 				userId: decoded.sub,
 			},

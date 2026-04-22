@@ -1,0 +1,13 @@
+{
+	"node": "n8n-nodes-base.googleMaps",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Utility", "Development"],
+	"resources": {
+		"primaryDocumentation": [
+			{
+				"url": "https://developers.google.com/maps/documentation/places/web-service/text-search"
+			}
+		]
+	}
+}

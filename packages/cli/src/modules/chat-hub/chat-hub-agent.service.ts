@@ -2,6 +2,7 @@ import {
 	type ChatHubUpdateAgentRequest,
 	type ChatHubCreateAgentRequest,
 	type ChatHubAgentDto,
+	type ChatHubAgentWorkflowTemplateDto,
 	type ChatModelDto,
 	type ChatHubAgentKnowledgeItem,
 	type ChatHubAgentKnowledgeItemStatus,
@@ -31,6 +32,7 @@ import { ChatHubExecutionService } from './chat-hub-execution.service';
 import { DynamicNodeParametersService } from '@/services/dynamic-node-parameters.service';
 import { getBase } from '@/workflow-execute-additional-data';
 import type { SemanticSearchOptions } from './chat-hub.types';
+import { ChatHubAgentValidationService } from './chat-hub-agent-validation.service';
 
 @Service()
 export class ChatHubAgentService {
@@ -45,6 +47,7 @@ export class ChatHubAgentService {
 		private readonly chatHubSettingsService: ChatHubSettingsService,
 		private readonly dynamicNodeParametersService: DynamicNodeParametersService,
 		private readonly chatHubToolService: ChatHubToolService,
+		private readonly chatHubAgentValidationService: ChatHubAgentValidationService,
 	) {
 		this.logger = this.logger.scoped('chat-hub');
 	}
@@ -79,6 +82,17 @@ export class ChatHubAgentService {
 		return await this.chatAgentRepository.getManyByUserId(userId);
 	}
 
+	async getAgentsByUserIdAsDto(userId: string): Promise<ChatHubAgentDto[]> {
+		const agents = await this.chatAgentRepository.getManyByUserIdWithToolIds(userId);
+
+		return agents.map((agent) =>
+			this.toDto(
+				agent,
+				(agent.tools ?? []).map((tool) => tool.id),
+			),
+		);
+	}
+
 	async getAgentById(id: string, userId: string, trx?: EntityManager): Promise<ChatHubAgent> {
 		const agent = await this.chatAgentRepository.getOneById(id, userId, trx);
 		if (!agent) {
@@ -94,11 +108,29 @@ export class ChatHubAgentService {
 		return this.toDto(agent, toolIds);
 	}
 
+	async getAgentWorkflowTemplate(
+		agentId: string,
+		user: User,
+	): Promise<ChatHubAgentWorkflowTemplateDto> {
+		const agent = await this.getAgentById(agentId, user.id);
+		const tools = await this.chatHubToolService.getToolDefinitionsForAgent(agentId);
+		const semanticSearchOptions = await this.chatHubSettingsService.getSemanticSearchOptions();
+
+		return this.chatHubWorkflowService.buildAgentWorkflowTemplate(
+			agent,
+			tools,
+			agent.files.length > 0 && semanticSearchOptions
+				? { agentId: agent.id, options: semanticSearchOptions }
+				: null,
+		);
+	}
+
 	async createAgent(user: User, data: ChatHubCreateAgentRequest): Promise<ChatHubAgentDto> {
 		// Ensure user has access to the credential being saved
 		await this.chatHubCredentialsService.ensureCredentialAccess(user, data.credentialId);
 
 		const id = uuidv4();
+		await this.validateAgentToolSelection(id, user.id, data.toolIds);
 
 		const agent = await this.chatAgentRepository.createAgent({
 			id,
@@ -136,6 +168,10 @@ export class ChatHubAgentService {
 		// Ensure user has access to the credential if provided
 		if (updates.credentialId !== undefined && updates.credentialId !== null) {
 			await this.chatHubCredentialsService.ensureCredentialAccess(user, updates.credentialId);
+		}
+
+		if (updates.toolIds !== undefined) {
+			await this.validateAgentToolSelection(id, user.id, updates.toolIds);
 		}
 
 		const updateData: Partial<IChatHubAgent> = {};
@@ -179,6 +215,19 @@ export class ChatHubAgentService {
 			createdAt: agent.createdAt.toISOString(),
 			updatedAt: agent.updatedAt.toISOString(),
 		};
+	}
+
+	private async validateAgentToolSelection(
+		agentId: string,
+		userId: string,
+		toolIds: string[],
+	): Promise<void> {
+		if (toolIds.length === 0) {
+			return;
+		}
+
+		const tools = await this.chatHubToolService.getToolsByIds(toolIds, userId);
+		this.chatHubAgentValidationService.validatePersonalAgentToolAssignments(agentId, tools);
 	}
 
 	async deleteAgent(id: string, userId: string): Promise<void> {

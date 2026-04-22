@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useChatStore } from '@/features/ai/chatHub/chat.store';
+import { fetchAgentWorkflowTemplateApi } from '@/features/ai/chatHub/chat.api';
 import { useToast } from '@/app/composables/useToast';
 import { useMessage } from '@/app/composables/useMessage';
 import { MODAL_CONFIRM } from '@/app/constants';
@@ -14,11 +15,16 @@ import { useUsersStore } from '@/features/settings/users/users.store';
 import { type ChatHubConversationModel } from '@n8n/api-types';
 import { filterAndSortAgents, stringifyModel } from '@/features/ai/chatHub/chat.utils';
 import type { ChatAgentFilter } from '@/features/ai/chatHub/chat.types';
+import { useCanvasOperations } from '@/app/composables/useCanvasOperations';
+import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useMediaQuery } from '@vueuse/core';
 import { AGENT_EDITOR_MODAL_KEY, MOBILE_MEDIA_QUERY } from '@/features/ai/chatHub/constants';
 import ChatLayout from '@/features/ai/chatHub/components/ChatLayout.vue';
 import SkeletonAgentCard from '@/features/ai/chatHub/components/SkeletonAgentCard.vue';
 import { useI18n } from '@n8n/i18n';
+import { VIEWS } from '@/app/constants/navigation';
+import { useRootStore } from '@n8n/stores/useRootStore';
+import type { AddedNodesAndConnections } from '@/Interface';
 
 const chatStore = useChatStore();
 const uiStore = useUIStore();
@@ -27,6 +33,9 @@ const router = useRouter();
 const toast = useToast();
 const message = useMessage();
 const usersStore = useUsersStore();
+const workflowsStore = useWorkflowsStore();
+const rootStore = useRootStore();
+const { addNodesAndConnections } = useCanvasOperations();
 const isMobileDevice = useMediaQuery(MOBILE_MEDIA_QUERY);
 const i18n = useI18n();
 
@@ -38,6 +47,7 @@ const { credentialsByProvider } = useChatCredentials(usersStore.currentUserId ??
 const readyToShowList = computed(() => chatStore.agentsReady);
 const allModels = computed(() => chatStore.agents['custom-agent'].models);
 const agents = computed(() => filterAndSortAgents(allModels.value, agentFilter.value));
+const canAddAgentsToWorkflow = computed(() => Boolean(workflowsStore.workflowId));
 
 function handleCreateAgent() {
 	uiStore.openModalWithData({
@@ -106,6 +116,41 @@ async function handleDeleteAgent(agentId: string) {
 	}
 }
 
+async function handleAddAgentToWorkflow(agentId: string) {
+	if (!workflowsStore.workflowId) {
+		toast.showMessage({
+			type: 'warning',
+			title: i18n.baseText('chatHub.personalAgents.addToWorkflow.noWorkflow'),
+		});
+		return;
+	}
+
+	try {
+		const template = (await fetchAgentWorkflowTemplateApi(
+			rootStore.restApiContext,
+			agentId,
+		)) as AddedNodesAndConnections;
+		await addNodesAndConnections(template.nodes, template.connections, {
+			trackHistory: true,
+			trackBulk: true,
+		});
+
+		if (route.name !== VIEWS.WORKFLOW && route.name !== VIEWS.NEW_WORKFLOW) {
+			await router.push({
+				name: workflowsStore.isNewWorkflow ? VIEWS.NEW_WORKFLOW : VIEWS.WORKFLOW,
+				params: workflowsStore.isNewWorkflow ? {} : { name: workflowsStore.workflowId },
+			});
+		}
+
+		toast.showMessage({
+			type: 'success',
+			title: i18n.baseText('chatHub.personalAgents.addToWorkflow.success'),
+		});
+	} catch (error) {
+		toast.showError(error, i18n.baseText('chatHub.personalAgents.addToWorkflow.error'));
+	}
+}
+
 watch(
 	credentialsByProvider,
 	(credentials) => {
@@ -155,7 +200,9 @@ watch(
 					<ChatAgentCard
 						v-if="agent.model.provider === 'custom-agent'"
 						:agent="agent"
+						:can-add-to-workflow="canAddAgentsToWorkflow"
 						@edit="handleEditAgent(agent.model)"
+						@add-to-workflow="handleAddAgentToWorkflow(agent.model.agentId)"
 						@delete="handleDeleteAgent(agent.model.agentId)"
 					/>
 				</template>

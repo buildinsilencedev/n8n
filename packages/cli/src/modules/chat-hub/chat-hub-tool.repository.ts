@@ -128,4 +128,16 @@ export class ChatHubToolRepository extends Repository<ChatHubTool> {
 			.of(agentId)
 			.addAndRemove(toolIds, currentToolIds);
 	}
+
+	async getAgentIdsForTool(toolId: string, trx?: EntityManager): Promise<string[]> {
+		const em = trx ?? this.manager;
+		const rows = await em
+			.createQueryBuilder(ChatHubAgent, 'agent')
+			.innerJoin('agent.tools', 'tool')
+			.select('agent.id', 'agentId')
+			.where('tool.id = :toolId', { toolId })
+			.getRawMany<{ agentId: string }>();
+
+		return rows.map((row) => row.agentId);
+	}
 }

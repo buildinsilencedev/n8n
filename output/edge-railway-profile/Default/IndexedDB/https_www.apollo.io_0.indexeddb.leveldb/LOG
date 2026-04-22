@@ -1,0 +1,6 @@
+2026/04/13-08:32:47.646 3554 Creating DB C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_www.apollo.io_0.indexeddb.leveldb since it was missing.
+2026/04/13-08:32:47.652 3554 Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_www.apollo.io_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/13-08:43:02.618 3560 Level-0 table #5: started
+2026/04/13-08:43:02.619 3560 Level-0 table #5: 1687 bytes OK
+2026/04/13-08:43:02.619 3560 Delete type=0 #3
+2026/04/13-08:43:02.620 3560 Manual compaction at level-0 from (begin) .. (end); will stop at (end)

@@ -48,6 +48,7 @@ import {
 	truncateToTitle,
 	generateThreadTitle,
 	patchThread,
+	runSwarmAgentRun,
 	type ConfirmationData,
 	type DomainAccessTracker,
 	type ManagedBackgroundTask,
@@ -1136,6 +1137,7 @@ export class InstanceAiService {
 
 		const domainTools = createAllTools(context);
 		const sandboxEntry = await this.getOrCreateWorkspace(threadId, user);
+		const swarm = await this.settingsService.resolveSwarmSettings(user);
 
 		const orchestrationContext: OrchestrationContext = {
 			threadId,
@@ -1149,6 +1151,7 @@ export class InstanceAiService {
 			eventBus: this.eventBus,
 			logger: this.logger,
 			domainTools,
+			swarm,
 			abortSignal,
 			taskStorage,
 			researchMode,
@@ -1706,53 +1709,41 @@ export class InstanceAiService {
 				],
 			});
 
+			const executeOrchestratorRun = async () => {
+				if (typeof streamInput === 'string') {
+					const swarmResult = await runSwarmAgentRun(streamInput, orchestrationContext);
+					if (swarmResult) {
+						return swarmResult;
+					}
+				}
+
+				return await streamAgentRun(
+					agent as StreamableAgent,
+					streamInput,
+					{
+						abortSignal: signal,
+						memory: {
+							resource: user.id,
+							thread: threadId,
+						},
+						providerOptions: {
+							anthropic: { cacheControl: { type: 'ephemeral' } },
+						},
+					},
+					{
+						threadId,
+						runId,
+						agentId: ORCHESTRATOR_AGENT_ID,
+						signal,
+						eventBus: this.eventBus,
+						logger: this.logger,
+					},
+				);
+			};
+
 			const result = tracing
-				? await tracing.withRunTree(tracing.actorRun, async () => {
-						return await streamAgentRun(
-							agent as StreamableAgent,
-							streamInput,
-							{
-								abortSignal: signal,
-								memory: {
-									resource: user.id,
-									thread: threadId,
-								},
-								providerOptions: {
-									anthropic: { cacheControl: { type: 'ephemeral' } },
-								},
-							},
-							{
-								threadId,
-								runId,
-								agentId: ORCHESTRATOR_AGENT_ID,
-								signal,
-								eventBus: this.eventBus,
-								logger: this.logger,
-							},
-						);
-					})
-				: await streamAgentRun(
-						agent as StreamableAgent,
-						streamInput,
-						{
-							abortSignal: signal,
-							memory: {
-								resource: user.id,
-								thread: threadId,
-							},
-							providerOptions: {
-								anthropic: { cacheControl: { type: 'ephemeral' } },
-							},
-						},
-						{
-							threadId,
-							runId,
-							agentId: ORCHESTRATOR_AGENT_ID,
-							signal,
-							eventBus: this.eventBus,
-							logger: this.logger,
-						},
-					);
+				? await tracing.withRunTree(tracing.actorRun, async () => await executeOrchestratorRun())
+				: await executeOrchestratorRun();
 			mastraRunId = result.mastraRunId;
 
 			if (result.status === 'suspended') {

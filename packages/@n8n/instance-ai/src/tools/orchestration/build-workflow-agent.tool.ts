@@ -338,8 +338,8 @@ export async function startBuildWorkflowAgentTask(
 								const json = await domainContext.workflowService.getAsWorkflowJSON(workflowId);
 								let rawCode = generateWorkflowCode(json);
 								rawCode = rawCode.replace(
-									/newCredential\('([^']*)',\s*'[^']*'\)/g,
-									"newCredential('$1')",
+									/newCredential\('([^']*)',\s*'([^']*)'\)/g,
+									"existingCredential('$1', '$2')",
 								);
 								const code = `${SDK_IMPORT_STATEMENT}\n\n${rawCode}`;
 								if (workspace.filesystem) {

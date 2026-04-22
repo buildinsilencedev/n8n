@@ -1,10 +1,9 @@
 import type { NodeTypeParser } from '@n8n/ai-workflow-builder';
 import { Logger } from '@n8n/backend-common';
 import { Service } from '@n8n/di';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
+import { resolveInstalledNodeDefinitionDirs } from '@/utils/node-definition-dirs.util';
 
 type NodeRequest =
 	| string
@@ -128,7 +127,10 @@ export class WorkflowBuilderToolsService {
 		const { nodes: nodeTypeDescriptions } = await this.loadNodesAndCredentials.collectTypes();
 
 		this.nodeTypeParser = new NodeTypeParserClass(nodeTypeDescriptions);
-		this.nodeDefinitionDirs = await this.resolveBuiltinNodeDefinitionDirs();
+		this.nodeDefinitionDirs = await resolveInstalledNodeDefinitionDirs(
+			this.loadNodesAndCredentials,
+			this.logger,
+		);
 
 		setSchemaBaseDirs(this.nodeDefinitionDirs);
 
@@ -158,21 +160,5 @@ export class WorkflowBuilderToolsService {
 		this.logger.debug('WorkflowBuilderToolsService refreshed node types', {
 			nodeTypeCount: nodeTypeDescriptions.length,
 		});
-	}
-
-	private async resolveBuiltinNodeDefinitionDirs(): Promise<string[]> {
-		const dirs: string[] = [];
-		for (const packageId of ['n8n-nodes-base', '@n8n/n8n-nodes-langchain']) {
-			try {
-				const packageJsonPath = require.resolve(`${packageId}/package.json`);
-				const distDir = path.dirname(packageJsonPath);
-				const nodeDefsDir = path.join(distDir, 'dist', 'node-definitions');
-				await fs.access(nodeDefsDir);
-				dirs.push(nodeDefsDir);
-			} catch (error) {
-				this.logger.debug(`Could not resolve node definitions for ${packageId}`, { error });
-			}
-		}
-		return dirs;
 	}
 }

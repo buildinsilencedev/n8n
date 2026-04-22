@@ -4,6 +4,7 @@ import { N8nButton, N8nIcon, type IconName } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { CollapsibleContent, CollapsibleRoot, CollapsibleTrigger } from 'reka-ui';
 import { computed } from 'vue';
+import type { BaseTextKey } from '@n8n/i18n';
 import { getToolIcon, useToolLabel } from '../toolLabels';
 import ButtonLike from './ButtonLike.vue';
 import DataSection from './DataSection.vue';
@@ -59,6 +60,45 @@ const toolCallsById = computed(() => {
 	return map;
 });
 
+const swarmSummary = computed(() => {
+	const swarm = props.agentNode.swarm;
+	if (!swarm) {
+		return null;
+	}
+
+	if (swarm.role === 'worker' && swarm.workerIndex && swarm.workerCount) {
+		return i18n.baseText('instanceAi.stepTimeline.swarm.worker' as BaseTextKey, {
+			interpolate: { current: swarm.workerIndex, total: swarm.workerCount },
+		});
+	}
+
+	if (swarm.role === 'coordinator' && swarm.workerCount) {
+		return i18n.baseText('instanceAi.stepTimeline.swarm.coordinator' as BaseTextKey, {
+			interpolate: { total: swarm.workerCount },
+		});
+	}
+
+	if (swarm.role === 'synthesizer') {
+		return i18n.baseText('instanceAi.stepTimeline.swarm.synthesizer' as BaseTextKey);
+	}
+
+	return null;
+});
+
+const usageSummary = computed(() => {
+	const usage = props.agentNode.usage;
+	if (!usage?.completedWorkers) {
+		return null;
+	}
+
+	return i18n.baseText('instanceAi.stepTimeline.swarm.usage' as BaseTextKey, {
+		interpolate: {
+			workers: usage.completedWorkers,
+			cost: usage.estimatedCostUsd?.toFixed(3) ?? '0.000',
+		},
+	});
+});
+
 const steps = computed((): TimelineStep[] => {
 	const result: TimelineStep[] = [];
 
@@ -105,6 +145,14 @@ const steps = computed((): TimelineStep[] => {
 
 <template>
 	<div :class="$style.timeline">
+		<ButtonLike v-if="swarmSummary">
+			<N8nIcon icon="brain" size="small" />
+			{{ swarmSummary }}
+		</ButtonLike>
+		<ButtonLike v-if="usageSummary">
+			<N8nIcon icon="circle-check" size="small" />
+			{{ usageSummary }}
+		</ButtonLike>
 		<template v-for="(step, idx) in steps" :key="idx">
 			<!-- Tool call: rendered via ToolCallStep (has its own icon column) -->
 			<ToolCallStep

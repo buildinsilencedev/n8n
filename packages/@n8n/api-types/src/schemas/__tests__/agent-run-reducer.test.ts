@@ -400,6 +400,54 @@ describe('agent-run-reducer', () => {
 			});
 		});
 
+		it('agent lifecycle preserves swarm metadata and usage', () => {
+			const state = stateWithRun('run-1', 'root');
+			reduceEvent(state, {
+				type: 'agent-spawned',
+				runId: 'run-1',
+				agentId: 'sub-1',
+				payload: {
+					parentId: 'root',
+					role: 'swarm-worker',
+					tools: ['fetch-url'],
+					swarm: {
+						groupId: 'swarm-1',
+						role: 'worker',
+						workerIndex: 1,
+						workerCount: 4,
+					},
+				},
+			});
+			reduceEvent(state, {
+				type: 'agent-completed',
+				runId: 'run-1',
+				agentId: 'sub-1',
+				payload: {
+					role: 'swarm-worker',
+					result: 'done',
+					usage: {
+						inputTokens: 120,
+						totalTokens: 120,
+						estimatedCostUsd: 0.002,
+						completedWorkers: 1,
+					},
+				},
+			});
+
+			expect(state.agentsById['sub-1'].swarm).toEqual({
+				groupId: 'swarm-1',
+				role: 'worker',
+				workerIndex: 1,
+				workerCount: 4,
+			});
+			expect(state.agentsById['sub-1'].usage).toEqual({
+				inputTokens: 120,
+				totalTokens: 120,
+				estimatedCostUsd: 0.002,
+				completedWorkers: 1,
+			});
+		});
+
 		it('agent-spawned with unknown parent is silently dropped', () => {
 			const state = stateWithRun('run-1', 'root');
 			reduceEvent(state, makeAgentSpawned('run-1', 'orphan', 'unknown-parent'));

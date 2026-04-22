@@ -196,4 +196,21 @@ describe('SubagentStepTimeline', () => {
 		);
 		expect(triggerButton).toBeTruthy();
 	});
+
+	it('should render swarm summary for worker nodes', () => {
+		const { getByText } = renderComponent({
+			props: {
+				agentNode: makeAgentNode({
+					swarm: {
+						groupId: 'swarm-1',
+						role: 'worker',
+						workerIndex: 2,
+						workerCount: 5,
+					},
+				}),
+			},
+		});
+
+		expect(getByText('Swarm worker 2 of 5')).toBeInTheDocument();
+	});
 });

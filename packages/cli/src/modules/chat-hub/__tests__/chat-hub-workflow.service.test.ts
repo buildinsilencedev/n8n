@@ -1207,6 +1207,91 @@ describe('ChatHubWorkflowService', () => {
 		});
 	});
 
+	describe('buildAgentWorkflowTemplate', () => {
+		const SEMANTIC_SEARCH_OPTIONS: SemanticSearchOptions = {
+			embeddingModel: { provider: 'openai', credentialId: 'embedding-cred' },
+			vectorStore: {
+				nodeType: 'vectorStore',
+				credentialType: 'pineconeApi',
+				credentialId: 'vs-cred',
+			},
+		};
+
+		it('builds a reusable workflow subgraph for a custom agent', () => {
+			const toolNode: INode = {
+				id: 'tool-1',
+				name: 'Lookup CRM',
+				type: '@n8n/n8n-nodes-langchain.toolWorkflow',
+				typeVersion: 2.2,
+				position: [0, 0],
+				parameters: {
+					source: 'database',
+					workflowId: { __rl: true, mode: 'id', value: 'wf-1' },
+				},
+			};
+
+			const result = service.buildAgentWorkflowTemplate(
+				{
+					id: 'agent-1',
+					name: 'Account Planner',
+					description: 'Plans account follow-up tasks',
+					systemPrompt: 'Summarize the next best actions for the account.',
+					credentialId: 'cred-1',
+					provider: 'openai',
+					model: 'gpt-4o-mini',
+					files: [
+						{
+							id: 'file-1',
+							type: 'embedding',
+							provider: 'openai',
+							fileName: 'playbook.pdf',
+							mimeType: 'application/pdf',
+						},
+					],
+				},
+				[toolNode],
+				{ agentId: 'agent-1', options: SEMANTIC_SEARCH_OPTIONS },
+			);
+
+			expect(result.nodes[0]).toMatchObject({
+				name: 'Account Planner',
+				type: '@n8n/n8n-nodes-langchain.agent',
+			});
+			expect(result.nodes[0].parameters).toMatchObject({
+				promptType: 'define',
+				options: expect.objectContaining({
+					systemMessage: expect.stringContaining('Plans account follow-up tasks'),
+				}),
+			});
+
+			const modelNode = result.nodes.find((node: INode) => node.name === NODE_NAMES.CHAT_MODEL);
+			expect(modelNode).toMatchObject({
+				type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+				credentials: { openAiApi: { id: 'cred-1', name: '' } },
+			});
+
+			const vectorStoreNode = result.nodes.find(
+				(node: INode) => node.name === NODE_NAMES.VECTOR_STORE,
+			);
+			expect(vectorStoreNode).toMatchObject({
+				type: SEMANTIC_SEARCH_OPTIONS.vectorStore.nodeType,
+			});
+
+			expect(result.connections).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						from: expect.objectContaining({ nodeIndex: 1, type: 'ai_languageModel' }),
+						to: expect.objectContaining({ nodeIndex: 0, type: 'ai_languageModel' }),
+					}),
+					expect.objectContaining({
+						from: expect.objectContaining({ type: 'ai_tool' }),
+						to: expect.objectContaining({ nodeIndex: 0, type: 'ai_tool' }),
+					}),
+				]),
+			);
+		});
+	});
+
 	describe('system message building', () => {
 		async function getAgentNodeSystemMessage(agent: ChatHubAgent): Promise<string> {
 			const serviceWithRepo = new ChatHubWorkflowService(

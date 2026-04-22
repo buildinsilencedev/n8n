@@ -5,6 +5,16 @@ export const nodeSchema = z
 	.object({
 		name: z.string(),
 		type: z.string(),
+		credentials: z
+			.array(
+				z.object({
+					id: z.string().describe('The credential ID'),
+					name: z.string().describe('The credential display name'),
+					type: z.string().describe('The credential type required by the node'),
+				}),
+			)
+			.optional()
+			.describe('Sanitized credential references attached to this node'),
 	})
 	.passthrough();
 

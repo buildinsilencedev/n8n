@@ -8,13 +8,24 @@ import { useSettingsField } from './useSettingsField';
 
 const CREATE_BRAVE = '__create_brave__';
 const CREATE_SEARXNG = '__create_searxng__';
+const CREATE_GOOGLE_MAPS = '__create_google_maps__';
+const CREATE_SAM_GOV = '__create_sam_gov__';
+
+const SEARCH_PROVIDER_LABELS: Record<string, string> = {
+	braveSearchApi: 'Brave',
+	searXngApi: 'SearXNG',
+	googleMapsApi: 'Google Maps',
+	samGovApi: 'SAM.gov',
+};
 
 const i18n = useI18n();
 const uiStore = useUIStore();
 const { store } = useSettingsField();
 
 const searchCredentials = computed(() =>
-	store.serviceCredentials.filter((c) => c.type === 'braveSearchApi' || c.type === 'searXngApi'),
+	store.serviceCredentials.filter((c) =>
+		['braveSearchApi', 'searXngApi', 'googleMapsApi', 'samGovApi'].includes(c.type),
+	),
 );
 
 const selectedSearchCredentialId = computed(() => {
@@ -33,6 +44,16 @@ function handleSearchCredentialChange(value: string | number | boolean | null) {
 	if (value === CREATE_SEARXNG) {
 		creatingCredential = true;
 		uiStore.openNewCredential('searXngApi');
+		return;
+	}
+	if (value === CREATE_GOOGLE_MAPS) {
+		creatingCredential = true;
+		uiStore.openNewCredential('googleMapsApi');
+		return;
+	}
+	if (value === CREATE_SAM_GOV) {
+		creatingCredential = true;
+		uiStore.openNewCredential('samGovApi');
 		return;
 	}
 	store.setField('searchCredentialId', value ? String(value) : null);
@@ -77,7 +98,7 @@ watch(
 					v-for="cred in searchCredentials"
 					:key="cred.id"
 					:value="cred.id"
-					:label="`${cred.name} (${cred.type === 'braveSearchApi' ? 'Brave' : 'SearXNG'})`"
+					:label="`${cred.name} (${SEARCH_PROVIDER_LABELS[cred.type] ?? cred.type})`"
 				/>
 				<N8nOption
 					:value="CREATE_BRAVE"
@@ -86,6 +107,14 @@ watch(
 				<N8nOption
 					:value="CREATE_SEARXNG"
 					:label="i18n.baseText('instanceAi.settings.credential.createSearxng')"
+				/>
+				<N8nOption
+					:value="CREATE_GOOGLE_MAPS"
+					:label="i18n.baseText('instanceAi.settings.credential.createGoogleMaps')"
+				/>
+				<N8nOption
+					:value="CREATE_SAM_GOV"
+					:label="i18n.baseText('instanceAi.settings.credential.createSamGov')"
 				/>
 			</N8nSelect>
 		</N8nInputLabel>

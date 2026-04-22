@@ -127,12 +127,25 @@ export async function getWorkflowDetails(
 
 	const nodes = workflow.nodes ?? [];
 	const connections = workflow.connections ?? {};
+
+	const sanitizeNode = (node: (typeof nodes)[number]) => {
+		const { credentials: _credentials, ...sanitizedNode } = node;
+		const sanitizedCredentials = Object.entries(node.credentials ?? {}).flatMap(([type, credential]) =>
+			credential?.id && credential.name
+				? [{ id: credential.id, name: credential.name, type }]
+				: [],
+		);
+
+		return {
+			...sanitizedNode,
+			...(sanitizedCredentials.length > 0 ? { credentials: sanitizedCredentials } : {}),
+		};
+	};
+
 	const activeVersion =
 		workflow.activeVersionId && workflow.activeVersion
 			? {
-					nodes: (workflow.activeVersion.nodes ?? []).map(
-						({ credentials: _credentials, ...node }) => node,
-					),
+					nodes: (workflow.activeVersion.nodes ?? []).map((node) => sanitizeNode(node)),
 					connections: workflow.activeVersion.connections ?? {},
 				}
 			: null;
@@ -162,7 +175,7 @@ export async function getWorkflowDetails(
 		updatedAt: workflow.updatedAt.toISOString(),
 		settings: workflow.settings ?? null,
 		connections,
-		nodes: nodes.map(({ credentials: _credentials, ...node }) => node),
+		nodes: nodes.map((node) => sanitizeNode(node)),
 		activeVersion,
 		tags: (workflow.tags ?? []).map((tag) => ({ id: tag.id, name: tag.name })),
 		meta: workflow.meta ?? null,

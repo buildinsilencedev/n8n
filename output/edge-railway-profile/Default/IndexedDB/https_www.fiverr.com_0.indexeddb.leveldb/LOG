@@ -1,0 +1,19 @@
+2026/04/03-20:09:08.735 32c0 Creating DB C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_www.fiverr.com_0.indexeddb.leveldb since it was missing.
+2026/04/03-20:09:08.740 32c0 Reusing MANIFEST C:\Users\Shadow\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_www.fiverr.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/04/03-20:09:09.481 32f4 Level-0 table #5: started
+2026/04/03-20:09:09.483 32f4 Level-0 table #5: 1453 bytes OK
+2026/04/03-20:09:09.484 32f4 Delete type=0 #3
+2026/04/03-20:09:09.485 32b8 Manual compaction at level-0 from '\x00\x02\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x03\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/04/03-20:09:09.558 32b8 Manual compaction at level-0 from '\x00\x03\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x04\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/04/03-22:45:01.339 32c0 Level-0 table #7: started
+2026/04/03-22:45:01.341 32c0 Level-0 table #7: 4610 bytes OK
+2026/04/03-22:45:01.342 32c0 Delete type=0 #4
+2026/04/03-22:45:01.342 32c0 Manual compaction at level-0 from (begin) .. (end); will stop at (end)
+2026/04/03-22:45:01.342 32c0 Manual compaction at level-1 from (begin) .. (end); will stop at '\x00\x06\x00\x00\xc8\x03\x00c\x00t\x00a' @ 395 : 1
+2026/04/03-22:45:01.342 32c0 Compacting 1@1 + 1@2 files
+2026/04/03-22:45:01.343 32c0 Generated table #8@1: 122 keys, 2073 bytes
+2026/04/03-22:45:01.343 32c0 Compacted 1@1 + 1@2 files => 2073 bytes
+2026/04/03-22:45:01.344 32c0 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/04/03-22:45:01.344 32c0 Delete type=2 #5
+2026/04/03-22:45:01.344 32c0 Delete type=2 #7
+2026/04/03-22:45:01.345 32c0 Manual compaction at level-1 from '\x00\x06\x00\x00\xc8\x03\x00c\x00t\x00a' @ 395 : 1 .. (end); will stop at (end)

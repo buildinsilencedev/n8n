@@ -87,7 +87,7 @@ export const createCreateWorkflowFromCodeTool = (
 		annotations: {
 			title: MCP_CREATE_WORKFLOW_FROM_CODE_TOOL.displayTitle,
 			readOnlyHint: false,
-			destructiveHint: false,
+			destructiveHint: true,
 			idempotentHint: false,
 			openWorldHint: false,
 		},

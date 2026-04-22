@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '@n8n/backend-common';
 import { ExecutionsConfig, GlobalConfig } from '@n8n/config';
+import { Time } from '@n8n/constants';
 import {
 	ExecutionRepository,
 	FolderRepository,
@@ -16,38 +17,45 @@ import {
 	type IDeferredPromise,
 	type IRun,
 } from 'n8n-workflow';
+import { createHash } from 'crypto';
 
-import {
-	createAddDataTableColumnTool,
-	createAddDataTableRowsTool,
-	createCreateDataTableTool,
-	createDeleteDataTableColumnTool,
-	createRenameDataTableColumnTool,
-	createRenameDataTableTool,
-	createSearchDataTablesTool,
-} from './tools/data-table';
+import { createAddDataTableColumnTool } from './tools/data-table/add-data-table-column.tool';
+import { createAddDataTableRowsTool } from './tools/data-table/add-data-table-rows.tool';
+import { createCreateDataTableTool } from './tools/data-table/create-data-table.tool';
+import { createDeleteDataTableColumnTool } from './tools/data-table/delete-data-table-column.tool';
+import { createRenameDataTableColumnTool } from './tools/data-table/rename-data-table-column.tool';
+import { createRenameDataTableTool } from './tools/data-table/rename-data-table.tool';
+import { createSearchDataTablesTool } from './tools/data-table/search-data-tables.tool';
 import { createExecuteWorkflowTool } from './tools/execute-workflow.tool';
+import { createGetCredentialTypesTool } from './tools/get-credential-types.tool';
 import { createGetExecutionTool } from './tools/get-execution.tool';
 import { createWorkflowDetailsTool } from './tools/get-workflow-details.tool';
+import type { ToolDefinition } from './mcp.types';
+import { createPrepareTestPinDataTool } from './tools/prepare-workflow-pin-data.tool';
 import { createPublishWorkflowTool } from './tools/publish-workflow.tool';
+import { createSearchCredentialsTool } from './tools/search-credentials.tool';
 import { createSearchFoldersTool } from './tools/search-folders.tool';
 import { createSearchProjectsTool } from './tools/search-projects.tool';
 import { createSearchWorkflowsTool } from './tools/search-workflows.tool';
+import { createTestWorkflowTool } from './tools/test-workflow.tool';
 import { createUnpublishWorkflowTool } from './tools/unpublish-workflow.tool';
-import { createCreateWorkflowFromCodeTool } from './tools/workflow-builder/create-workflow-from-code.tool';
 import { createArchiveWorkflowTool } from './tools/workflow-builder/delete-workflow.tool';
-import { createUpdateWorkflowTool } from './tools/workflow-builder/update-workflow.tool';
+import { createCreateWorkflowFromCodeTool } from './tools/workflow-builder/create-workflow-from-code.tool';
 import { createGetSuggestedWorkflowNodesTool } from './tools/workflow-builder/get-suggested-workflow-nodes.tool';
 import { createGetWorkflowNodeTypesTool } from './tools/workflow-builder/get-workflow-node-types.tool';
 import { createGetWorkflowSdkReferenceTool } from './tools/workflow-builder/get-workflow-sdk-reference.tool';
 import { getMcpInstructions } from './tools/workflow-builder/mcp-instructions';
 import { createSearchWorkflowNodesTool } from './tools/workflow-builder/search-workflow-nodes.tool';
 import { getSdkReferenceContent } from './tools/workflow-builder/sdk-reference-content';
+import { createUpdateWorkflowTool } from './tools/workflow-builder/update-workflow.tool';
 import { createValidateWorkflowCodeTool } from './tools/workflow-builder/validate-workflow-code.tool';
 import { WorkflowBuilderToolsService } from './tools/workflow-builder/workflow-builder-tools.service';
 
 import { ActiveExecutions } from '@/active-executions';
+import { N8N_VERSION } from '@/constants';
 import { CredentialsService } from '@/credentials/credentials.service';
+import { ExecutionService } from '@/executions/execution.service';
+import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
 import { DataTableProxyService } from '@/modules/data-table/data-table-proxy.service';
 import { NodeTypes } from '@/node-types';
 import { ProjectService } from '@/services/project.service.ee';
@@ -58,9 +66,6 @@ import { WorkflowRunner } from '@/workflow-runner';
 import { WorkflowCreationService } from '@/workflows/workflow-creation.service';
 import { WorkflowFinderService } from '@/workflows/workflow-finder.service';
 import { WorkflowService } from '@/workflows/workflow.service';
-import { createPrepareTestPinDataTool } from './tools/prepare-workflow-pin-data.tool';
-import { createTestWorkflowTool } from './tools/test-workflow.tool';
-import { ExecutionService } from '@/executions/execution.service';
 
 /**
  * Pending MCP execution response, used for queue mode support.
@@ -69,6 +74,24 @@ interface PendingMcpResponse {
 	executionId: string;
 	promise: IDeferredPromise<IRun | undefined>;
 	createdAt: Date;
+}
+
+type ExternalMcpToolRegistry = {
+	tools: ToolDefinition[];
+	registerResources: (server: InstanceType<typeof McpServer>) => void;
+};
+
+const MCP_TOOLSET_HASH_LENGTH = 8;
+const MCP_PENDING_RESPONSE_TTL_MS = 15 * Time.minutes.toMilliseconds;
+const MCP_MAX_PENDING_RESPONSES = 500;
+
+export function createExternalMcpVersion(appVersion: string, toolNames: string[]): string {
+	const toolsetHash = createHash('sha256')
+		.update([...toolNames].sort().join('\n'))
+		.digest('hex')
+		.slice(0, MCP_TOOLSET_HASH_LENGTH);
+
+	return `${appVersion}-mcp.${toolsetHash}`;
 }
 
 @Service()
@@ -87,6 +110,7 @@ export class McpService {
 		private readonly workflowService: WorkflowService,
 		private readonly urlService: UrlService,
 		private readonly credentialsService: CredentialsService,
+		private readonly loadNodesAndCredentials: LoadNodesAndCredentials,
 		private readonly activeExecutions: ActiveExecutions,
 		private readonly globalConfig: GlobalConfig,
 		private readonly telemetry: Telemetry,
@@ -107,288 +131,170 @@ export class McpService {
 	async getServer(user: User) {
 		const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
 		const builderEnabled = this.globalConfig.endpoints.mcpBuilderEnabled;
+		const externalToolRegistry = await this.getExternalToolRegistry(user);
 		const server = new McpServer(
 			{
 				name: 'n8n MCP Server',
-				version: builderEnabled ? '1.1.0' : '1.0.0',
+				version: createExternalMcpVersion(
+					N8N_VERSION,
+					externalToolRegistry.tools.map((tool) => tool.name),
+				),
 			},
 			{
 				instructions: getMcpInstructions(builderEnabled),
 			},
 		);
 
-		// Existing tools
-		const workflowSearchTool = createSearchWorkflowsTool(
-			user,
-			this.workflowService,
-			this.telemetry,
-		);
-		server.registerTool(
-			workflowSearchTool.name,
-			workflowSearchTool.config,
-			workflowSearchTool.handler,
-		);
-
-		const executeWorkflowTool = createExecuteWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowRunner,
-			this.telemetry,
-			this,
-		);
-		server.registerTool(
-			executeWorkflowTool.name,
-			executeWorkflowTool.config,
-			executeWorkflowTool.handler,
-		);
-
-		const getExecutionTool = createGetExecutionTool(
-			user,
-			this.executionRepository,
-			this.workflowFinderService,
-			this.telemetry,
-		);
-		server.registerTool(getExecutionTool.name, getExecutionTool.config, getExecutionTool.handler);
-
-		const workflowDetailsTool = createWorkflowDetailsTool(
-			user,
-			this.urlService.getWebhookBaseUrl(),
-			this.workflowFinderService,
-			this.credentialsService,
-			{
-				webhook: this.globalConfig.endpoints.webhook,
-				webhookTest: this.globalConfig.endpoints.webhookTest,
-			},
-			this.telemetry,
-			this.roleService,
-			this.projectService,
-		);
-		server.registerTool(
-			workflowDetailsTool.name,
-			workflowDetailsTool.config,
-			workflowDetailsTool.handler,
-		);
-
-		const publishWorkflowTool = createPublishWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowService,
-			this.telemetry,
-		);
-		server.registerTool(
-			publishWorkflowTool.name,
-			publishWorkflowTool.config,
-			publishWorkflowTool.handler,
-		);
-
-		const unpublishWorkflowTool = createUnpublishWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowService,
-			this.telemetry,
-		);
-		server.registerTool(
-			unpublishWorkflowTool.name,
-			unpublishWorkflowTool.config,
-			unpublishWorkflowTool.handler,
-		);
-
-		const prepareTestPinDataTool = createPrepareTestPinDataTool(
-			user,
-			this.workflowFinderService,
-			this.executionService,
-			this.nodeTypes,
-			this.telemetry,
-			this.logger,
-		);
-		server.registerTool(
-			prepareTestPinDataTool.name,
-			prepareTestPinDataTool.config,
-			prepareTestPinDataTool.handler,
-		);
-
-		const testWorkflowTool = createTestWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.activeExecutions,
-			this.workflowRunner,
-			this.nodeTypes,
-			this.telemetry,
-			this,
-		);
-		server.registerTool(testWorkflowTool.name, testWorkflowTool.config, testWorkflowTool.handler);
-
-		// Data table tools
-		const dataTableOps = this.dataTableProxyService.makeDataTableOperationsForUser(user);
-
-		const searchDataTablesTool = createSearchDataTablesTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			searchDataTablesTool.name,
-			searchDataTablesTool.config,
-			searchDataTablesTool.handler,
-		);
-
-		const createDataTableTool = createCreateDataTableTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			createDataTableTool.name,
-			createDataTableTool.config,
-			createDataTableTool.handler,
-		);
-
-		const renameDataTableTool = createRenameDataTableTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			renameDataTableTool.name,
-			renameDataTableTool.config,
-			renameDataTableTool.handler,
-		);
-
-		const addDataTableColumnTool = createAddDataTableColumnTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			addDataTableColumnTool.name,
-			addDataTableColumnTool.config,
-			addDataTableColumnTool.handler,
-		);
-
-		const deleteDataTableColumnTool = createDeleteDataTableColumnTool(
-			user,
-			dataTableOps,
-			this.telemetry,
-		);
-		server.registerTool(
-			deleteDataTableColumnTool.name,
-			deleteDataTableColumnTool.config,
-			deleteDataTableColumnTool.handler,
-		);
-
-		const renameDataTableColumnTool = createRenameDataTableColumnTool(
-			user,
-			dataTableOps,
-			this.telemetry,
-		);
-		server.registerTool(
-			renameDataTableColumnTool.name,
-			renameDataTableColumnTool.config,
-			renameDataTableColumnTool.handler,
-		);
-
-		const addDataTableRowsTool = createAddDataTableRowsTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			addDataTableRowsTool.name,
-			addDataTableRowsTool.config,
-			addDataTableRowsTool.handler,
-		);
-
-		// Workflow builder tools (enabled via N8N_MCP_BUILDER_ENABLED)
-		if (builderEnabled) {
-			await this.registerBuilderTools(server, user);
+		for (const tool of externalToolRegistry.tools) {
+			server.registerTool(tool.name, tool.config, tool.handler);
 		}
+		externalToolRegistry.registerResources(server);
 
 		return server;
 	}
 
-	private async registerBuilderTools(server: InstanceType<typeof McpServer>, user: User) {
+	async getExternalToolRegistry(user: User): Promise<ExternalMcpToolRegistry> {
+		const tools: ToolDefinition[] = [];
+		const dataTableOps = this.dataTableProxyService.makeDataTableOperationsForUser(user);
+
+		tools.push(
+			createSearchWorkflowsTool(user, this.workflowService, this.telemetry),
+			createExecuteWorkflowTool(
+				user,
+				this.workflowFinderService,
+				this.workflowRunner,
+				this.telemetry,
+				this,
+			),
+			createSearchCredentialsTool(user, this.credentialsService, this.telemetry),
+			createGetCredentialTypesTool(user, this.loadNodesAndCredentials, this.telemetry),
+			createGetExecutionTool(
+				user,
+				this.executionRepository,
+				this.workflowFinderService,
+				this.telemetry,
+			),
+			createWorkflowDetailsTool(
+				user,
+				this.urlService.getWebhookBaseUrl(),
+				this.workflowFinderService,
+				this.credentialsService,
+				{
+					webhook: this.globalConfig.endpoints.webhook,
+					webhookTest: this.globalConfig.endpoints.webhookTest,
+				},
+				this.telemetry,
+				this.roleService,
+				this.projectService,
+			),
+			createPublishWorkflowTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.telemetry,
+			),
+			createUnpublishWorkflowTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.telemetry,
+			),
+			createPrepareTestPinDataTool(
+				user,
+				this.workflowFinderService,
+				this.executionService,
+				this.nodeTypes,
+				this.telemetry,
+				this.logger,
+			),
+			createTestWorkflowTool(
+				user,
+				this.workflowFinderService,
+				this.activeExecutions,
+				this.workflowRunner,
+				this.nodeTypes,
+				this.telemetry,
+				this,
+			),
+			createSearchDataTablesTool(user, dataTableOps, this.telemetry),
+			createCreateDataTableTool(user, dataTableOps, this.telemetry),
+			createRenameDataTableTool(user, dataTableOps, this.telemetry),
+			createAddDataTableColumnTool(user, dataTableOps, this.telemetry),
+			createDeleteDataTableColumnTool(user, dataTableOps, this.telemetry),
+			createRenameDataTableColumnTool(user, dataTableOps, this.telemetry),
+			createAddDataTableRowsTool(user, dataTableOps, this.telemetry),
+		);
+
+		if (!this.globalConfig.endpoints.mcpBuilderEnabled) {
+			return {
+				tools,
+				registerResources: () => {},
+			};
+		}
+
 		await this.workflowBuilderToolsService.initialize();
 
-		const searchNodesTool = createSearchWorkflowNodesTool(
-			user,
-			this.workflowBuilderToolsService,
-			this.telemetry,
-		);
-		server.registerTool(searchNodesTool.name, searchNodesTool.config, searchNodesTool.handler);
-
-		const getNodeTypesTool = createGetWorkflowNodeTypesTool(
-			user,
-			this.workflowBuilderToolsService,
-			this.telemetry,
-		);
-		server.registerTool(getNodeTypesTool.name, getNodeTypesTool.config, getNodeTypesTool.handler);
-
-		const suggestedNodesTool = createGetSuggestedWorkflowNodesTool(
-			user,
-			this.workflowBuilderToolsService,
-			this.telemetry,
-		);
-		server.registerTool(
-			suggestedNodesTool.name,
-			suggestedNodesTool.config,
-			suggestedNodesTool.handler,
-		);
-
-		const validateTool = createValidateWorkflowCodeTool(user, this.telemetry);
-		server.registerTool(validateTool.name, validateTool.config, validateTool.handler);
-
-		const createTool = createCreateWorkflowFromCodeTool(
-			user,
-			this.workflowCreationService,
-			this.urlService,
-			this.telemetry,
-			this.nodeTypes,
-			this.credentialsService,
-			this.projectRepository,
-		);
-		server.registerTool(createTool.name, createTool.config, createTool.handler);
-
-		const searchProjectsTool = createSearchProjectsTool(
-			user,
-			this.projectRepository,
-			this.telemetry,
-		);
-		server.registerTool(
-			searchProjectsTool.name,
-			searchProjectsTool.config,
-			searchProjectsTool.handler,
+		tools.push(
+			createSearchWorkflowNodesTool(user, this.workflowBuilderToolsService, this.telemetry),
+			createGetWorkflowNodeTypesTool(user, this.workflowBuilderToolsService, this.telemetry),
+			createGetSuggestedWorkflowNodesTool(user, this.workflowBuilderToolsService, this.telemetry),
+			createValidateWorkflowCodeTool(user, this.telemetry),
+			createCreateWorkflowFromCodeTool(
+				user,
+				this.workflowCreationService,
+				this.urlService,
+				this.telemetry,
+				this.nodeTypes,
+				this.credentialsService,
+				this.projectRepository,
+			),
+			createSearchProjectsTool(user, this.projectRepository, this.telemetry),
+			createSearchFoldersTool(user, this.folderRepository, this.projectService, this.telemetry),
+			createArchiveWorkflowTool(user, this.workflowService, this.telemetry),
+			createUpdateWorkflowTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.urlService,
+				this.telemetry,
+				this.nodeTypes,
+				this.credentialsService,
+				this.sharedWorkflowRepository,
+			),
+			createGetWorkflowSdkReferenceTool(user, this.telemetry),
 		);
 
-		const searchFoldersTool = createSearchFoldersTool(
-			user,
-			this.folderRepository,
-			this.projectService,
-			this.telemetry,
-		);
-		server.registerTool(
-			searchFoldersTool.name,
-			searchFoldersTool.config,
-			searchFoldersTool.handler,
-		);
-
-		const archiveTool = createArchiveWorkflowTool(user, this.workflowService, this.telemetry);
-		server.registerTool(archiveTool.name, archiveTool.config, archiveTool.handler);
-
-		const updateTool = createUpdateWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowService,
-			this.urlService,
-			this.telemetry,
-			this.nodeTypes,
-			this.credentialsService,
-			this.sharedWorkflowRepository,
-		);
-		server.registerTool(updateTool.name, updateTool.config, updateTool.handler);
-
-		// SDK reference as MCP resource — for clients that support resources.
-		server.resource(
-			'workflow-sdk-reference',
-			'n8n://workflow-sdk/reference',
-			{
-				description:
-					'n8n Workflow SDK reference — patterns, expressions, and rules for building workflows. Get this FIRST before building workflows to learn the SDK.',
-			},
-			async () => ({
-				contents: [
+		return {
+			tools,
+			registerResources: (server: InstanceType<typeof McpServer>) => {
+				server.resource(
+					'workflow-sdk-reference',
+					'n8n://workflow-sdk/reference',
 					{
-						uri: 'n8n://workflow-sdk/reference',
-						mimeType: 'text/plain',
-						text: getSdkReferenceContent(),
+						description:
+							'n8n Workflow SDK reference â€” patterns, expressions, and rules for building workflows. Get this FIRST before building workflows to learn the SDK.',
 					},
-				],
-			}),
-		);
+					async () => ({
+						contents: [
+							{
+								uri: 'n8n://workflow-sdk/reference',
+								mimeType: 'text/plain',
+								text: getSdkReferenceContent(),
+							},
+						],
+					}),
+				);
+			},
+		};
+	}
 
-		// SDK reference tool — always registered alongside the MCP resource above,
-		// so all clients can access the SDK reference regardless of resource support.
-		const sdkRefTool = createGetWorkflowSdkReferenceTool(user, this.telemetry);
-		server.registerTool(sdkRefTool.name, sdkRefTool.config, sdkRefTool.handler);
+	async getExternalToolNames(user: User): Promise<string[]> {
+		const { tools } = await this.getExternalToolRegistry(user);
+		return tools.map((tool) => tool.name);
+	}
+
+	async getAdvertisedMcpVersion(user: User): Promise<string> {
+		return createExternalMcpVersion(N8N_VERSION, await this.getExternalToolNames(user));
 	}
 
 	// #region Queue Mode Support
@@ -405,6 +311,12 @@ export class McpService {
 	 * Returns a promise that will be resolved when the worker sends the response.
 	 */
 	createPendingResponse(executionId: string): IDeferredPromise<IRun | undefined> {
+		this.cleanupExpiredPendingResponses();
+
+		if (this.pendingResponses.size >= MCP_MAX_PENDING_RESPONSES) {
+			throw new Error('Too many pending MCP executions');
+		}
+
 		const deferred = createDeferredPromise<IRun | undefined>();
 		this.pendingResponses.set(executionId, {
 			executionId,
@@ -484,6 +396,21 @@ export class McpService {
 	 */
 	get pendingExecutionCount(): number {
 		return this.pendingResponses.size;
+	}
+
+	private cleanupExpiredPendingResponses(now = Date.now()): void {
+		for (const [executionId, pending] of this.pendingResponses.entries()) {
+			const ageMs = now - pending.createdAt.getTime();
+			if (ageMs < MCP_PENDING_RESPONSE_TTL_MS) {
+				continue;
+			}
+
+			this.logger.warn('Cleaning up expired pending MCP response', {
+				executionId,
+				ageMs,
+			});
+			this.cancelPendingExecution(executionId, 'MCP execution timed out while awaiting worker response');
+		}
 	}
 
 	// #endregion
