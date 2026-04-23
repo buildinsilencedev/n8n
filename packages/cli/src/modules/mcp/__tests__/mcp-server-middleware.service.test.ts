@@ -10,14 +10,21 @@ import { Telemetry } from '@/telemetry';
 import { McpServerApiKeyService } from '../mcp-api-key.service';
 import { McpOAuthTokenService } from '../mcp-oauth-token.service';
 import { McpServerMiddlewareService } from '../mcp-server-middleware.service';
+import type { TenantMcpContext } from '../mcp.types';
+import { TenantMcpLinkService } from '../tenant-mcp-link.service';
 
-const mockReqWith = (authHeader: string | undefined, body?: any) => {
+const mockReqWith = (
+	authHeader: string | undefined,
+	body?: any,
+	params: Record<string, string> = {},
+) => {
 	const req = mockDeep<Request>();
 	req.header.mockImplementation((name: string) => {
 		if (name === 'authorization') return authHeader;
 		return undefined;
 	});
 	req.body = body || {};
+	req.params = params;
 	return req;
 };
 
@@ -26,6 +33,7 @@ const jwtService = new JwtService(instanceSettings, mock());
 
 let mcpServerApiKeyService: jest.Mocked<McpServerApiKeyService>;
 let oauthTokenService: jest.Mocked<McpOAuthTokenService>;
+let tenantMcpLinkService: jest.Mocked<TenantMcpLinkService>;
 let telemetry: jest.Mocked<Telemetry>;
 let service: McpServerMiddlewareService;
 
@@ -35,11 +43,13 @@ describe('McpServerMiddlewareService', () => {
 			McpServerApiKeyService,
 		) as jest.Mocked<McpServerApiKeyService>;
 		oauthTokenService = mockInstance(McpOAuthTokenService) as jest.Mocked<McpOAuthTokenService>;
+		tenantMcpLinkService = mockInstance(TenantMcpLinkService) as jest.Mocked<TenantMcpLinkService>;
 		telemetry = mockInstance(Telemetry);
 
 		service = new McpServerMiddlewareService(
 			mcpServerApiKeyService,
 			oauthTokenService,
+			tenantMcpLinkService,
 			jwtService,
 			telemetry,
 		);
@@ -98,6 +108,53 @@ describe('McpServerMiddlewareService', () => {
 			expect(result).toEqual({ user });
 			expect(mcpServerApiKeyService.verifyApiKey).toHaveBeenCalledWith(apiKeyToken);
 			expect(oauthTokenService.verifyOAuthAccessToken).not.toHaveBeenCalled();
+		});
+
+		it('should return user and tenant context for tenant MCP token without route tenant', async () => {
+			const user = mock<User>({ id: 'user-123' });
+			const tenantMcp: TenantMcpContext = {
+				tenantId: 'tenant-123',
+				projectId: 'project-123',
+				linkId: 'link-123',
+			};
+			const tenantToken = jwtService.sign({
+				sub: 'user-123',
+				aud: 'mcp-server-api',
+				meta: { isTenantMcp: true },
+			});
+
+			tenantMcpLinkService.verifyTenantToken.mockResolvedValue({ user, tenantMcp });
+
+			const result = await service.getUserForToken(tenantToken);
+
+			expect(result).toEqual({ user, tenantMcp });
+			expect(tenantMcpLinkService.verifyTenantToken).toHaveBeenCalledWith(tenantToken, undefined);
+			expect(oauthTokenService.verifyOAuthAccessToken).not.toHaveBeenCalled();
+			expect(mcpServerApiKeyService.verifyApiKey).not.toHaveBeenCalled();
+		});
+
+		it('should pass route tenant when validating tenant MCP token', async () => {
+			const user = mock<User>({ id: 'user-123' });
+			const tenantMcp: TenantMcpContext = {
+				tenantId: 'tenant-123',
+				projectId: 'project-123',
+				linkId: 'link-123',
+			};
+			const tenantToken = jwtService.sign({
+				sub: 'user-123',
+				aud: 'mcp-server-api',
+				meta: { isTenantMcp: true },
+			});
+
+			tenantMcpLinkService.verifyTenantToken.mockResolvedValue({ user, tenantMcp });
+
+			const result = await service.getUserForToken(tenantToken, 'tenant-123');
+
+			expect(result).toEqual({ user, tenantMcp });
+			expect(tenantMcpLinkService.verifyTenantToken).toHaveBeenCalledWith(
+				tenantToken,
+				'tenant-123',
+			);
 		});
 
 		it('should return null for invalid JWT format', async () => {
@@ -265,6 +322,101 @@ describe('McpServerMiddlewareService', () => {
 			expect((req as any).user).toEqual(user);
 			expect(next).toHaveBeenCalled();
 			expect(res.status).not.toHaveBeenCalled();
+		});
+
+		it('should authenticate tenant MCP token without route tenant and attach tenant context', async () => {
+			const user = mock<User>({ id: 'user-123' });
+			const tenantMcp: TenantMcpContext = {
+				tenantId: 'tenant-123',
+				projectId: 'project-123',
+				linkId: 'link-123',
+			};
+			const tenantToken = jwtService.sign({
+				sub: 'user-123',
+				aud: 'mcp-server-api',
+				meta: { isTenantMcp: true },
+			});
+
+			const req = mockReqWith(`Bearer ${tenantToken}`);
+			const res = mockDeep<Response>();
+			const next = jest.fn() as NextFunction;
+
+			tenantMcpLinkService.verifyTenantToken.mockResolvedValue({ user, tenantMcp });
+
+			const middleware = service.getAuthMiddleware();
+
+			await middleware(req, res, next);
+
+			expect(tenantMcpLinkService.verifyTenantToken).toHaveBeenCalledWith(tenantToken, undefined);
+			expect((req as any).user).toEqual(user);
+			expect((req as any).tenantMcp).toEqual(tenantMcp);
+			expect(next).toHaveBeenCalled();
+			expect(res.status).not.toHaveBeenCalled();
+		});
+
+		it('should authenticate tenant MCP token with matching route tenant', async () => {
+			const user = mock<User>({ id: 'user-123' });
+			const tenantMcp: TenantMcpContext = {
+				tenantId: 'tenant-123',
+				projectId: 'project-123',
+				linkId: 'link-123',
+			};
+			const tenantToken = jwtService.sign({
+				sub: 'user-123',
+				aud: 'mcp-server-api',
+				meta: { isTenantMcp: true },
+			});
+
+			const req = mockReqWith(`Bearer ${tenantToken}`, undefined, { tenantId: 'tenant-123' });
+			const res = mockDeep<Response>();
+			const next = jest.fn() as NextFunction;
+
+			tenantMcpLinkService.verifyTenantToken.mockResolvedValue({ user, tenantMcp });
+
+			const middleware = service.getAuthMiddleware();
+
+			await middleware(req, res, next);
+
+			expect(tenantMcpLinkService.verifyTenantToken).toHaveBeenCalledWith(
+				tenantToken,
+				'tenant-123',
+			);
+			expect((req as any).user).toEqual(user);
+			expect((req as any).tenantMcp).toEqual(tenantMcp);
+			expect(next).toHaveBeenCalled();
+			expect(res.status).not.toHaveBeenCalled();
+		});
+
+		it('should return 401 when tenant MCP token does not match route tenant', async () => {
+			const tenantToken = jwtService.sign({
+				sub: 'user-123',
+				aud: 'mcp-server-api',
+				meta: { isTenantMcp: true },
+			});
+
+			const req = mockReqWith(`Bearer ${tenantToken}`, undefined, { tenantId: 'other-tenant' });
+			const res = mockDeep<Response>();
+			res.status.mockReturnThis();
+			res.send.mockReturnThis();
+			res.header.mockReturnThis();
+			const next = jest.fn() as NextFunction;
+
+			tenantMcpLinkService.verifyTenantToken.mockResolvedValue({
+				user: null,
+				context: { reason: 'invalid_token', auth_type: 'api_key' },
+			});
+
+			const middleware = service.getAuthMiddleware();
+
+			await middleware(req, res, next);
+
+			expect(tenantMcpLinkService.verifyTenantToken).toHaveBeenCalledWith(
+				tenantToken,
+				'other-tenant',
+			);
+			expect(res.status).toHaveBeenCalledWith(401);
+			expect(res.send).toHaveBeenCalledWith({ message: 'Unauthorized' });
+			expect(next).not.toHaveBeenCalled();
 		});
 
 		it('should return 401 with WWW-Authenticate header when token validation fails', async () => {

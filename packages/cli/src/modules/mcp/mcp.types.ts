@@ -28,6 +28,7 @@ export type SearchWorkflowsParams = {
 	limit?: number;
 	query?: string;
 	projectId?: string;
+	availableInMCP?: boolean;
 };
 
 export type SearchWorkflowsItem = {
@@ -127,4 +128,15 @@ export type TelemetryAuthContext = {
 export type UserWithContext = {
 	user: User | null;
 	context?: TelemetryAuthContext;
+	tenantMcp?: TenantMcpContext;
+};
+
+export type TenantMcpContext = {
+	tenantId: string;
+	projectId: string;
+	linkId: string;
+};
+
+export type McpRequestContext = {
+	tenantMcp?: TenantMcpContext;
 };

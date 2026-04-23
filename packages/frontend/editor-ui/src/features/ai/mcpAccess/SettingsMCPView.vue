@@ -7,11 +7,13 @@ import { computed, onMounted, ref } from 'vue';
 import { useMCPStore } from '@/features/ai/mcpAccess/mcp.store';
 import { useUsersStore } from '@/features/settings/users/users.store';
 import { useUIStore } from '@/app/stores/ui.store';
+import CopyInput from '@/app/components/CopyInput.vue';
 import {
 	LOADING_INDICATOR_TIMEOUT,
 	MCP_CONNECT_WORKFLOWS_MODAL_KEY,
 	MCP_DOCS_PAGE_URL,
 } from '@/features/ai/mcpAccess/mcp.constants';
+import { useProjectsStore } from '@/features/collaboration/projects/projects.store';
 import MCPEmptyState from '@/features/ai/mcpAccess/components/MCPEmptyState.vue';
 import MCpHeaderActions from '@/features/ai/mcpAccess/components/header/MCPHeaderActions.vue';
 import WorkflowsTable from '@/features/ai/mcpAccess/components/tabs/WorkflowsTable.vue';
@@ -21,8 +23,10 @@ import {
 	N8nTabs,
 	N8nTooltip,
 	N8nButton,
+	N8nInputLabel,
 	N8nText,
 	N8nLink,
+	N8nNotice,
 	N8nPreviewTag,
 } from '@n8n/design-system';
 import type { TabOptions } from '@n8n/design-system';
@@ -42,6 +46,7 @@ const telemetry = useTelemetry();
 const mcpStore = useMCPStore();
 const usersStore = useUsersStore();
 const uiStore = useUIStore();
+const projectsStore = useProjectsStore();
 
 const mcpStatusLoading = ref(false);
 const selectedTab = ref<MCPTabs>('workflows');
@@ -63,6 +68,11 @@ const availableWorkflows = ref<WorkflowListItem[]>([]);
 const oAuthClientsLoading = ref(false);
 const connectedOAuthClients = ref<OAuthClientResponseDto[]>([]);
 
+const selectedTenantProjectId = ref('');
+const tenantLinkLoading = ref(false);
+const tenantLinkRotating = ref(false);
+const revealedTenantToken = ref<string | null>(null);
+
 const isOwner = computed(() => usersStore.isInstanceOwner);
 const isAdmin = computed(() => usersStore.isAdmin);
 
@@ -71,6 +81,27 @@ const canToggleMCP = computed(() => isOwner.value || isAdmin.value);
 const showConnectWorkflowsButton = computed(() => {
 	return selectedTab.value === 'workflows' && availableWorkflows.value.length > 0;
 });
+
+const tenantProjects = computed(() =>
+	projectsStore.availableProjects.filter((project) =>
+		['project:admin', 'project:personalOwner'].includes(project.role),
+	),
+);
+
+const selectedTenantProject = computed(() =>
+	tenantProjects.value.find((project) => project.id === selectedTenantProjectId.value),
+);
+
+const selectedTenantLink = computed(() =>
+	selectedTenantProjectId.value ? mcpStore.tenantMcpLinks[selectedTenantProjectId.value] : null,
+);
+
+const tenantTokenValue = computed(
+	() =>
+		revealedTenantToken.value ??
+		selectedTenantLink.value?.tokenPreview ??
+		i18n.baseText('settings.mcp.tenants.token.empty'),
+);
 
 const onTabSelected = async (tab: MCPTabs) => {
 	selectedTab.value = tab;
@@ -87,6 +118,7 @@ const onToggleMCPAccess = async (enabled: boolean) => {
 		mcpStatusLoading.value = true;
 		const updated = await mcpStore.setMcpAccessEnabled(enabled);
 		if (updated) {
+			await fetchTenantLink();
 			await fetchAvailableWorkflows();
 			await fetchoAuthCLients();
 		} else {
@@ -139,6 +171,51 @@ const onTableRefresh = async () => {
 		await fetchAvailableWorkflows();
 	} else if (selectedTab.value === 'oauth') {
 		await fetchoAuthCLients();
+	}
+};
+
+const fetchTenantLink = async () => {
+	if (!selectedTenantProjectId.value) return;
+
+	try {
+		tenantLinkLoading.value = true;
+		revealedTenantToken.value = null;
+		await mcpStore.getTenantMcpLink(selectedTenantProjectId.value);
+	} catch (error) {
+		toast.showError(error, i18n.baseText('settings.mcp.tenants.fetch.error'));
+	} finally {
+		setTimeout(() => {
+			tenantLinkLoading.value = false;
+		}, LOADING_INDICATOR_TIMEOUT);
+	}
+};
+
+const onTenantProjectSelected = async (event: Event) => {
+	const target = event.target;
+	if (!(target instanceof HTMLSelectElement)) return;
+
+	selectedTenantProjectId.value = target.value;
+	await fetchTenantLink();
+};
+
+const rotateTenantLink = async () => {
+	if (!selectedTenantProjectId.value) return;
+
+	try {
+		tenantLinkRotating.value = true;
+		const link = await mcpStore.generateNewTenantMcpLink(selectedTenantProjectId.value);
+		revealedTenantToken.value = link.token ?? null;
+		toast.showMessage({
+			type: 'success',
+			title: i18n.baseText('settings.mcp.tenants.rotate.success.title'),
+			message: i18n.baseText('settings.mcp.tenants.rotate.success.message'),
+		});
+	} catch (error) {
+		toast.showError(error, i18n.baseText('settings.mcp.tenants.rotate.error'));
+	} finally {
+		setTimeout(() => {
+			tenantLinkRotating.value = false;
+		}, LOADING_INDICATOR_TIMEOUT);
 	}
 };
 
@@ -204,9 +281,12 @@ const openConnectWorkflowsModal = () => {
 
 onMounted(async () => {
 	documentTitle.set(i18n.baseText('settings.mcp'));
+	await projectsStore.getAvailableProjects();
+	selectedTenantProjectId.value = tenantProjects.value[0]?.id ?? '';
 	if (!mcpStore.mcpAccessEnabled) {
 		return;
 	}
+	await fetchTenantLink();
 	await fetchAvailableWorkflows();
 });
 </script>
@@ -253,6 +333,62 @@ onMounted(async () => {
 			:class="$style.container"
 			data-test-id="mcp-enabled-section"
 		>
+			<section
+				v-if="tenantProjects.length > 0"
+				:class="$style['tenant-link']"
+				data-test-id="mcp-tenant-link-settings"
+			>
+				<div :class="$style['tenant-header']">
+					<div>
+						<N8nHeading size="medium">
+							{{ i18n.baseText('settings.mcp.tenants.title') }}
+						</N8nHeading>
+						<N8nText size="small" color="text-light">
+							{{ i18n.baseText('settings.mcp.tenants.description') }}
+						</N8nText>
+					</div>
+					<N8nButton
+						size="small"
+						icon="refresh-cw"
+						:label="i18n.baseText('settings.mcp.tenants.rotate')"
+						:loading="tenantLinkRotating"
+						:disabled="!selectedTenantProjectId || tenantLinkLoading"
+						data-test-id="mcp-tenant-link-rotate"
+						@click="rotateTenantLink"
+					/>
+				</div>
+				<div :class="$style['tenant-grid']">
+					<N8nInputLabel :label="i18n.baseText('settings.mcp.tenants.project')">
+						<select
+							:class="$style['project-select']"
+							:value="selectedTenantProjectId"
+							data-test-id="mcp-tenant-project-select"
+							@change="onTenantProjectSelected"
+						>
+							<option v-for="project in tenantProjects" :key="project.id" :value="project.id">
+								{{ project.name }}
+							</option>
+						</select>
+					</N8nInputLabel>
+					<CopyInput
+						:label="i18n.baseText('settings.mcp.tenants.endpoint')"
+						:value="selectedTenantLink?.url ?? ''"
+						:disable-copy="tenantLinkLoading || !selectedTenantLink?.url"
+						:toast-message="selectedTenantProject?.name ?? undefined"
+						size="large"
+					/>
+					<CopyInput
+						:label="i18n.baseText('settings.mcp.tenants.token')"
+						:value="tenantTokenValue"
+						:disable-copy="!revealedTenantToken"
+						:redact-value="true"
+						size="large"
+					/>
+				</div>
+				<N8nNotice v-if="revealedTenantToken" theme="warning">
+					{{ i18n.baseText('settings.mcp.tenants.token.notice') }}
+				</N8nNotice>
+			</section>
 			<header :class="$style['tabs-header']">
 				<N8nTabs :model-value="selectedTab" :options="tabs" @update:model-value="onTabSelected" />
 				<div :class="$style.actions">
@@ -335,6 +471,47 @@ onMounted(async () => {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+}
+
+.tenant-link {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing--sm);
+	padding-bottom: var(--spacing--xl);
+	margin-bottom: var(--spacing--xl);
+	border-bottom: var(--border);
+}
+
+.tenant-header {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--spacing--md);
+	align-items: flex-start;
+
+	@media (max-width: 820px) {
+		flex-direction: column;
+	}
+}
+
+.tenant-grid {
+	display: grid;
+	grid-template-columns: minmax(180px, 240px) minmax(240px, 1fr) minmax(240px, 1fr);
+	gap: var(--spacing--sm);
+	align-items: end;
+
+	@media (max-width: 980px) {
+		grid-template-columns: 1fr;
+	}
+}
+
+.project-select {
+	width: 100%;
+	min-height: 40px;
+	padding: 0 var(--spacing--xs);
+	color: var(--color--text);
+	background: var(--color--background--xlight);
+	border: var(--border);
+	border-radius: var(--radius);
 }
 
 .actions {

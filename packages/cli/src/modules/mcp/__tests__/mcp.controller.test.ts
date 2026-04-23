@@ -20,6 +20,7 @@ import { McpController, type FlushableResponse } from '../mcp.controller';
 import { McpRequestLimiterService } from '../mcp-request-limiter.service';
 import { McpService } from '../mcp.service';
 import { McpSettingsService } from '../mcp.settings.service';
+import type { TenantMcpContext } from '../mcp.types';
 
 jest.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => {
 	const StreamableHTTPServerTransport = jest.fn().mockImplementation((_opts) => ({
@@ -29,7 +30,9 @@ jest.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => {
 	return { StreamableHTTPServerTransport };
 });
 
-const createReq = (overrides: Partial<AuthenticatedRequest> = {}): AuthenticatedRequest =>
+const createReq = (
+	overrides: Partial<AuthenticatedRequest & { tenantMcp?: TenantMcpContext }> = {},
+): AuthenticatedRequest =>
 	({
 		user: { id: 'user-1' },
 		body: {},
@@ -41,8 +44,14 @@ const createRes = (): FlushableResponse => {
 	const res = mock<FlushableResponse>();
 	res.status.mockReturnThis();
 	res.json.mockReturnThis();
+	res.send.mockReturnThis();
 	return res;
 };
+
+const createMcpServer = () => ({
+	connect: jest.fn().mockResolvedValue(undefined),
+	close: jest.fn().mockResolvedValue(undefined),
+});
 
 describe('McpController', () => {
 	let controller: McpController;
@@ -74,13 +83,59 @@ describe('McpController', () => {
 
 	test('creates mcp server if MCP access is enabled', async () => {
 		(mcpSettingsService.getEnabled as jest.Mock).mockResolvedValue(true);
-		(mcpService.getServer as unknown as jest.Mock).mockReturnValue({
-			connect: jest.fn().mockResolvedValue(undefined),
-			close: jest.fn().mockResolvedValue(undefined),
-		});
+		(mcpService.getServer as unknown as jest.Mock).mockReturnValue(createMcpServer());
 		const res = createRes();
 		await controller.build(createReq(), res);
 		expect(mcpService.getServer as unknown as jest.Mock).toHaveBeenCalled();
+	});
+
+	test('passes tenant context from base endpoint to MCP server', async () => {
+		const tenantMcp: TenantMcpContext = {
+			tenantId: 'tenant-123',
+			projectId: 'project-123',
+			linkId: 'link-123',
+		};
+
+		(mcpSettingsService.getEnabled as jest.Mock).mockResolvedValue(true);
+		(mcpService.getServer as unknown as jest.Mock).mockReturnValue(createMcpServer());
+
+		const res = createRes();
+		await controller.build(createReq({ tenantMcp }), res);
+
+		expect(mcpService.getServer as unknown as jest.Mock).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'user-1' }),
+			{ tenantMcp },
+		);
+	});
+
+	test('returns 401 from tenant endpoint if tenant context is missing', async () => {
+		(mcpSettingsService.getEnabled as jest.Mock).mockResolvedValue(true);
+
+		const res = createRes();
+		await controller.buildTenant(createReq(), res);
+
+		expect(res.status).toHaveBeenCalledWith(401);
+		expect(res.send).toHaveBeenCalledWith({ message: 'Unauthorized' });
+		expect(mcpService.getServer as unknown as jest.Mock).not.toHaveBeenCalled();
+	});
+
+	test('passes tenant context from tenant endpoint to MCP server', async () => {
+		const tenantMcp: TenantMcpContext = {
+			tenantId: 'tenant-123',
+			projectId: 'project-123',
+			linkId: 'link-123',
+		};
+
+		(mcpSettingsService.getEnabled as jest.Mock).mockResolvedValue(true);
+		(mcpService.getServer as unknown as jest.Mock).mockReturnValue(createMcpServer());
+
+		const res = createRes();
+		await controller.buildTenant(createReq({ tenantMcp }), res);
+
+		expect(mcpService.getServer as unknown as jest.Mock).toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'user-1' }),
+			{ tenantMcp },
+		);
 	});
 
 	test('HEAD /http returns 401 with WWW-Authenticate header for auth scheme discovery', async () => {

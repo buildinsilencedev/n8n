@@ -12,12 +12,13 @@ import {
 	USER_CONNECTED_TO_MCP_EVENT,
 	MCP_ACCESS_DISABLED_ERROR_MESSAGE,
 	INTERNAL_SERVER_ERROR_MESSAGE,
+	UNAUTHORIZED_ERROR_MESSAGE,
 } from './mcp.constants';
 import { McpService } from './mcp.service';
 import { McpRequestLimiterService } from './mcp-request-limiter.service';
 import { McpSettingsService } from './mcp.settings.service';
 import { isJSONRPCRequest } from './mcp.typeguards';
-import type { UserConnectedToMCPEventPayload } from './mcp.types';
+import type { McpRequestContext, UserConnectedToMCPEventPayload } from './mcp.types';
 import { getClientInfo } from './mcp.utils';
 
 export type FlushableResponse = Response & { flush: () => void };
@@ -87,6 +88,16 @@ export class McpController {
 		res.status(204).end();
 	}
 
+	@Options('/tenant/:tenantId/http', {
+		skipAuth: true,
+		usesTemplates: true,
+		ipRateLimit: { limit: 100 },
+	})
+	handleTenantPreflight(req: Request, res: Response) {
+		this.setCorsHeaders(req, res);
+		res.status(204).end();
+	}
+
 	/**
 	 * HEAD endpoint for authentication scheme discovery
 	 * Per RFC 6750 Section 3, returns 401 with WWW-Authenticate header
@@ -102,6 +113,16 @@ export class McpController {
 		res.status(401).end();
 	}
 
+	@Head('/tenant/:tenantId/http', {
+		skipAuth: true,
+		usesTemplates: true,
+	})
+	async discoverTenantAuthSchemeHead(req: Request, res: Response) {
+		this.setCorsHeaders(req, res);
+		res.header('WWW-Authenticate', 'Bearer realm="n8n MCP Server"');
+		res.status(401).end();
+	}
+
 	@Post('/http', {
 		ipRateLimit: { limit: 100 },
 		middlewares: [getAuthMiddleware()],
@@ -109,6 +130,24 @@ export class McpController {
 		usesTemplates: true,
 	})
 	async build(req: AuthenticatedRequest, res: FlushableResponse) {
+		await this.handleMcpRequest(req, res);
+	}
+
+	@Post('/tenant/:tenantId/http', {
+		ipRateLimit: { limit: 100 },
+		middlewares: [getAuthMiddleware()],
+		skipAuth: true,
+		usesTemplates: true,
+	})
+	async buildTenant(req: AuthenticatedRequest, res: FlushableResponse) {
+		if (!(req as AuthenticatedRequest & McpRequestContext).tenantMcp) {
+			res.status(401).send({ message: UNAUTHORIZED_ERROR_MESSAGE });
+			return;
+		}
+		await this.handleMcpRequest(req, res);
+	}
+
+	private async handleMcpRequest(req: AuthenticatedRequest, res: FlushableResponse) {
 		this.setCorsHeaders(req, res);
 
 		const body = req.body;
@@ -170,7 +209,12 @@ export class McpController {
 			const { StreamableHTTPServerTransport } = await import(
 				'@modelcontextprotocol/sdk/server/streamableHttp.js'
 			);
-			const server = await this.mcpService.getServer(req.user);
+			const server = await this.mcpService.getServer(
+				req.user,
+				(req as AuthenticatedRequest & McpRequestContext).tenantMcp
+					? { tenantMcp: (req as AuthenticatedRequest & McpRequestContext).tenantMcp }
+					: undefined,
+			);
 			const transport = new StreamableHTTPServerTransport({
 				sessionIdGenerator: undefined,
 			});

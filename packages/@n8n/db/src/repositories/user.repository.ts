@@ -4,7 +4,7 @@ import { PROJECT_OWNER_ROLE_SLUG, PROJECT_VIEWER_ROLE_SLUG } from '@n8n/permissi
 import type { DeepPartial, EntityManager, SelectQueryBuilder } from '@n8n/typeorm';
 import { Brackets, DataSource, In, IsNull, Not, Repository } from '@n8n/typeorm';
 
-import { ApiKey, Project, ProjectRelation, User } from '../entities';
+import { ApiKey, Project, ProjectRelation, Tenant, User } from '../entities';
 
 @Service()
 export class UserRepository extends Repository<User> {
@@ -124,6 +124,13 @@ export class UserRepository extends Repository<User> {
 					type: 'personal',
 					name: userWithRole.createPersonalProjectName(),
 					creatorId: savedUser.id,
+				}),
+			);
+			await entityManager.save<Tenant>(
+				entityManager.create(Tenant, {
+					name: savedProject.name,
+					projectId: savedProject.id,
+					createdByUserId: savedUser.id,
 				}),
 			);
 

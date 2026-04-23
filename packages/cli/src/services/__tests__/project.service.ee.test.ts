@@ -14,6 +14,7 @@ import { mock } from 'jest-mock-extended';
 
 import { ProjectService } from '../project.service.ee';
 import type { RoleService } from '../role.service';
+import type { TenantMcpLinkService } from '@/modules/mcp/tenant-mcp-link.service';
 
 describe('ProjectService', () => {
 	const manager = mock<EntityManager>();
@@ -22,6 +23,7 @@ describe('ProjectService', () => {
 	const roleService = mock<RoleService>();
 	const sharedCredentialsRepository = mock<SharedCredentialsRepository>();
 	const moduleRegistry = mock<ModuleRegistry>({ entities: [] });
+	const tenantMcpLinkService = mock<TenantMcpLinkService>();
 	const projectService = new ProjectService(
 		mock(),
 		projectRepository,
@@ -30,6 +32,7 @@ describe('ProjectService', () => {
 		sharedCredentialsRepository,
 		mock(),
 		moduleRegistry,
+		tenantMcpLinkService,
 	);
 
 	describe('getAccessibleProjectsAndCount', () => {

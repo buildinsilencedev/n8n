@@ -21,6 +21,7 @@ const inputSchema = {
 	limit: createLimitSchema(MAX_RESULTS),
 	query: z.string().optional().describe('Filter by name or description'),
 	projectId: z.string().optional(),
+	availableInMCP: z.boolean().optional().describe('Filter by MCP availability'),
 } satisfies z.ZodRawShape;
 
 const outputSchema = {
@@ -82,12 +83,14 @@ export const createSearchWorkflowsTool = (
 			limit = MAX_RESULTS,
 			query,
 			projectId,
+			availableInMCP,
 		}: {
 			limit?: number;
 			query?: string;
 			projectId?: string;
+			availableInMCP?: boolean;
 		}) => {
-			const parameters = { limit, query, projectId };
+			const parameters = { limit, query, projectId, availableInMCP };
 			const telemetryPayload: UserCalledMCPToolEventPayload = {
 				user_id: user.id,
 				tool_name: 'search_workflows',
@@ -99,6 +102,7 @@ export const createSearchWorkflowsTool = (
 					limit,
 					query,
 					projectId,
+					availableInMCP,
 				});
 
 				// Track successful execution
@@ -136,7 +140,7 @@ export const createSearchWorkflowsTool = (
 export async function searchWorkflows(
 	user: User,
 	workflowService: WorkflowService,
-	{ limit = MAX_RESULTS, query, projectId }: SearchWorkflowsParams,
+	{ limit = MAX_RESULTS, query, projectId, availableInMCP }: SearchWorkflowsParams,
 ): Promise<SearchWorkflowsResult> {
 	const safeLimit = Math.min(Math.max(1, limit), MAX_RESULTS);
 
@@ -146,6 +150,7 @@ export async function searchWorkflows(
 			isArchived: false,
 			...(query ? { query } : {}),
 			...(projectId ? { projectId } : {}),
+			...(availableInMCP !== undefined ? { availableInMCP } : {}),
 		},
 		select: {
 			id: true,

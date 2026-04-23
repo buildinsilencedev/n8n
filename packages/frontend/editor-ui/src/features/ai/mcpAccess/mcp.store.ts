@@ -16,6 +16,9 @@ import {
 	fetchOAuthClients,
 	deleteOAuthClient,
 	fetchMcpEligibleWorkflows,
+	fetchTenantMcpLink,
+	rotateTenantMcpLink,
+	type TenantMcpLink,
 } from '@/features/ai/mcpAccess/mcp.api';
 import { computed, ref } from 'vue';
 import { useSettingsStore } from '@/app/stores/settings.store';
@@ -29,6 +32,7 @@ export const useMCPStore = defineStore(MCP_STORE, () => {
 	const settingsStore = useSettingsStore();
 
 	const currentUserMCPKey = ref<ApiKey | null>(null);
+	const tenantMcpLinks = ref<Record<string, TenantMcpLink>>({});
 	const oauthClients = ref<OAuthClientResponseDto[]>([]);
 	const connectPopoverOpen = ref(false);
 
@@ -117,6 +121,18 @@ export const useMCPStore = defineStore(MCP_STORE, () => {
 		currentUserMCPKey.value = null;
 	}
 
+	async function getTenantMcpLink(projectId: string): Promise<TenantMcpLink> {
+		const link = await fetchTenantMcpLink(rootStore.restApiContext, projectId);
+		tenantMcpLinks.value = { ...tenantMcpLinks.value, [projectId]: link };
+		return link;
+	}
+
+	async function generateNewTenantMcpLink(projectId: string): Promise<TenantMcpLink> {
+		const link = await rotateTenantMcpLink(rootStore.restApiContext, projectId);
+		tenantMcpLinks.value = { ...tenantMcpLinks.value, [projectId]: link };
+		return link;
+	}
+
 	async function getAllOAuthClients(): Promise<OAuthClientResponseDto[]> {
 		const response = await fetchOAuthClients(rootStore.restApiContext);
 		oauthClients.value = response.data;
@@ -152,9 +168,12 @@ export const useMCPStore = defineStore(MCP_STORE, () => {
 		setMcpAccessEnabled,
 		toggleWorkflowMcpAccess,
 		currentUserMCPKey,
+		tenantMcpLinks,
 		getOrCreateApiKey,
 		generateNewApiKey,
 		resetCurrentUserMCPKey,
+		getTenantMcpLink,
+		generateNewTenantMcpLink,
 		oauthClients,
 		getAllOAuthClients,
 		removeOAuthClient,

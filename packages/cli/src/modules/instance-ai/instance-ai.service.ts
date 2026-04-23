@@ -1835,7 +1835,6 @@ export class InstanceAiService {
 				throw error;
 			}
 
-<<<<<<< HEAD
 			// Pre-save the user message so it survives page refresh during HITL.
 			// Mastra's workflow pipeline defers message persistence to stream
 			// completion, so memory.recall() returns nothing for the current turn
@@ -1872,6 +1871,7 @@ export class InstanceAiService {
 					agent as StreamableAgent,
 					streamInput,
 					{
+						maxSteps: MAX_STEPS.ORCHESTRATOR,
 						abortSignal: signal,
 						memory: {
 							resource: user.id,
@@ -1895,57 +1895,6 @@ export class InstanceAiService {
 			const result = tracing
 				? await tracing.withRunTree(tracing.actorRun, async () => await executeOrchestratorRun())
 				: await executeOrchestratorRun();
-=======
-			const result = tracing
-				? await tracing.withRunTree(tracing.actorRun, async () => {
-						return await streamAgentRun(
-							agent as StreamableAgent,
-							streamInput,
-							{
-								maxSteps: MAX_STEPS.ORCHESTRATOR,
-								abortSignal: signal,
-								memory: {
-									resource: user.id,
-									thread: threadId,
-								},
-								providerOptions: {
-									anthropic: { cacheControl: { type: 'ephemeral' } },
-								},
-							},
-							{
-								threadId,
-								runId,
-								agentId: ORCHESTRATOR_AGENT_ID,
-								signal,
-								eventBus: this.eventBus,
-								logger: this.logger,
-							},
-						);
-					})
-				: await streamAgentRun(
-						agent as StreamableAgent,
-						streamInput,
-						{
-							maxSteps: MAX_STEPS.ORCHESTRATOR,
-							abortSignal: signal,
-							memory: {
-								resource: user.id,
-								thread: threadId,
-							},
-							providerOptions: {
-								anthropic: { cacheControl: { type: 'ephemeral' } },
-							},
-						},
-						{
-							threadId,
-							runId,
-							agentId: ORCHESTRATOR_AGENT_ID,
-							signal,
-							eventBus: this.eventBus,
-							logger: this.logger,
-						},
-					);
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 			mastraRunId = result.mastraRunId;
 
 			if (result.status === 'suspended') {

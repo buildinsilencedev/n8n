@@ -6,7 +6,8 @@ import { ensureError } from 'n8n-workflow';
 import { McpServerApiKeyService } from './mcp-api-key.service';
 import { McpOAuthTokenService } from './mcp-oauth-token.service';
 import { USER_CONNECTED_TO_MCP_EVENT, UNAUTHORIZED_ERROR_MESSAGE } from './mcp.constants';
-import type { TelemetryAuthContext, UserWithContext } from './mcp.types';
+import { TenantMcpLinkService } from './tenant-mcp-link.service';
+import type { McpRequestContext, TelemetryAuthContext, UserWithContext } from './mcp.types';
 import { getClientInfo } from './mcp.utils';
 
 import { AuthError } from '@/errors/response-errors/auth.error';
@@ -23,6 +24,7 @@ export class McpServerMiddlewareService {
 	constructor(
 		private readonly mcpServerApiKeyService: McpServerApiKeyService,
 		private readonly mcpAuthTokenService: McpOAuthTokenService,
+		private readonly tenantMcpLinkService: TenantMcpLinkService,
 		private readonly jwtService: JwtService,
 		private readonly telemetry: Telemetry,
 	) {}
@@ -31,10 +33,12 @@ export class McpServerMiddlewareService {
 	 * Get user for a given token (API key or OAuth access token)
 	 * Uses JWT metadata to determine token type and route to correct validation
 	 */
-	async getUserForToken(token: string): Promise<UserWithContext> {
-		let decoded: { meta?: { isOAuth?: boolean } };
+	async getUserForToken(token: string, routeTenantId?: string): Promise<UserWithContext> {
+		let decoded: { meta?: { isOAuth?: boolean; isTenantMcp?: boolean } };
 		try {
-			decoded = this.jwtService.decode<{ meta?: { isOAuth?: boolean } }>(token);
+			decoded = this.jwtService.decode<{ meta?: { isOAuth?: boolean; isTenantMcp?: boolean } }>(
+				token,
+			);
 		} catch (error) {
 			return {
 				user: null,
@@ -48,6 +52,10 @@ export class McpServerMiddlewareService {
 
 		if (decoded?.meta?.isOAuth === true) {
 			return await this.mcpAuthTokenService.verifyOAuthAccessToken(token);
+		}
+
+		if (decoded?.meta?.isTenantMcp === true) {
+			return await this.tenantMcpLinkService.verifyTenantToken(token, routeTenantId);
 		}
 
 		return await this.mcpServerApiKeyService.verifyApiKey(token);
@@ -83,7 +91,7 @@ export class McpServerMiddlewareService {
 				return;
 			}
 
-			const result = await this.getUserForToken(token);
+			const result = await this.getUserForToken(token, req.params.tenantId);
 			const user = result.user;
 
 			if (!user) {
@@ -92,6 +100,7 @@ export class McpServerMiddlewareService {
 			}
 
 			(req as AuthenticatedRequest).user = user;
+			(req as Request & McpRequestContext).tenantMcp = result.tenantMcp;
 
 			next();
 		};

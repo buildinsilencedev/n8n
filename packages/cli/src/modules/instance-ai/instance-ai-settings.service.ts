@@ -91,7 +91,7 @@ interface PersistedAdminSettings {
 	n8nSandboxCredentialId?: string | null;
 	searchCredentialId?: string | null;
 	localGatewayDisabled?: boolean;
-<<<<<<< HEAD
+	optinModalDismissed?: boolean;
 }
 
 /** Per-user preferences stored under USER_PREFERENCES_KEY_PREFIX + userId. */
@@ -100,9 +100,6 @@ interface PersistedUserPreferences {
 	modelName?: string;
 	swarmMode?: InstanceAiSwarmMode;
 	localGatewayDisabled?: boolean;
-=======
-	optinModalDismissed?: boolean;
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 }
 
 @Service()
@@ -266,13 +263,9 @@ export class InstanceAiSettingsService {
 			credentialType,
 			credentialName,
 			modelName: prefs.modelName || this.extractModelName(this.config.model),
-<<<<<<< HEAD
 			swarmMode: prefs.swarmMode ?? 'auto',
 			localGatewayDisabled:
 				this.config.localGatewayDisabled || (prefs.localGatewayDisabled ?? false),
-=======
-			localGatewayDisabled: prefs.localGatewayDisabled ?? false,
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 		};
 	}
 

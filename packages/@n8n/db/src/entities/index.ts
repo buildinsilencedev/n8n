@@ -31,6 +31,8 @@ import { Settings } from './settings';
 import { SharedCredentials } from './shared-credentials';
 import { SharedWorkflow } from './shared-workflow';
 import { TagEntity } from './tag-entity';
+import { Tenant } from './tenant';
+import { TenantMcpLink } from './tenant-mcp-link';
 import { TestCaseExecution } from './test-case-execution.ee';
 import { TestRun } from './test-run.ee';
 import { User } from './user';
@@ -69,6 +71,8 @@ export {
 	SharedCredentials,
 	SharedWorkflow,
 	TagEntity,
+	Tenant,
+	TenantMcpLink,
 	User,
 	WorkflowDependency,
 	WorkflowEntity,
@@ -112,6 +116,8 @@ export const entities = {
 	SharedCredentials,
 	SharedWorkflow,
 	TagEntity,
+	Tenant,
+	TenantMcpLink,
 	User,
 	WorkflowDependency,
 	WorkflowEntity,

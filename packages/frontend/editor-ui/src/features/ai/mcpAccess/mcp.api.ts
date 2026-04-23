@@ -11,6 +11,19 @@ export type McpSettingsResponse = {
 	mcpAccessEnabled: boolean;
 };
 
+export type TenantMcpLink = {
+	tenantId: string;
+	projectId: string;
+	url: string;
+	active: boolean;
+	createdAt?: string;
+	updatedAt?: string;
+	lastUsedAt?: string | null;
+	revokedAt?: string | null;
+	tokenPreview?: string;
+	token?: string;
+};
+
 export async function getMcpSettings(context: IRestApiContext): Promise<McpSettingsResponse> {
 	return await makeRestApiRequest(context, 'GET', '/mcp/settings');
 }
@@ -30,6 +43,28 @@ export async function fetchApiKey(context: IRestApiContext): Promise<ApiKey> {
 
 export async function rotateApiKey(context: IRestApiContext): Promise<ApiKey> {
 	return await makeRestApiRequest(context, 'POST', '/mcp/api-key/rotate');
+}
+
+export async function fetchTenantMcpLink(
+	context: IRestApiContext,
+	projectId: string,
+): Promise<TenantMcpLink> {
+	return await makeRestApiRequest(
+		context,
+		'GET',
+		`/mcp/projects/${encodeURIComponent(projectId)}/tenant-link`,
+	);
+}
+
+export async function rotateTenantMcpLink(
+	context: IRestApiContext,
+	projectId: string,
+): Promise<TenantMcpLink> {
+	return await makeRestApiRequest(
+		context,
+		'POST',
+		`/mcp/projects/${encodeURIComponent(projectId)}/tenant-link/rotate`,
+	);
 }
 
 export async function toggleWorkflowMcpAccessApi(

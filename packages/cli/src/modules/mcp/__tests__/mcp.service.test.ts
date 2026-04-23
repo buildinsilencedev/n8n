@@ -21,11 +21,8 @@ import {
 import { WorkflowBuilderToolsService } from '../tools/workflow-builder/workflow-builder-tools.service';
 
 import { ActiveExecutions } from '@/active-executions';
-<<<<<<< HEAD
-import { N8N_VERSION } from '@/constants';
-=======
 import { CollaborationService } from '@/collaboration/collaboration.service';
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
+import { N8N_VERSION } from '@/constants';
 import { CredentialsService } from '@/credentials/credentials.service';
 import { ExecutionService } from '@/executions/execution.service';
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
@@ -85,6 +82,7 @@ describe('McpService', () => {
 			mockInstance(ExecutionRepository),
 			mockInstance(ExecutionService),
 			mockInstance(DataTableProxyService),
+			mockInstance(CollaborationService),
 		);
 	};
 
@@ -97,37 +95,6 @@ describe('McpService', () => {
 			hostId: 'test-host-id',
 		});
 		logger = mockLogger();
-<<<<<<< HEAD
-=======
-
-		mcpService = new McpService(
-			logger,
-			executionsConfig,
-			instanceSettings,
-			mockInstance(WorkflowFinderService),
-			mockInstance(WorkflowService),
-			mockInstance(UrlService),
-			mockInstance(CredentialsService),
-			activeExecutions,
-			mockInstance(GlobalConfig, {
-				endpoints: { webhook: '/webhook', webhookTest: '/webhook-test' },
-			}),
-			mockInstance(Telemetry),
-			mockInstance(WorkflowRunner),
-			mockInstance(RoleService),
-			mockInstance(ProjectService),
-			mockInstance(WorkflowBuilderToolsService),
-			mockInstance(WorkflowCreationService),
-			mockInstance(NodeTypes),
-			mockInstance(ProjectRepository),
-			mockInstance(FolderRepository),
-			mockInstance(SharedWorkflowRepository),
-			mockInstance(ExecutionRepository),
-			mockInstance(ExecutionService),
-			mockInstance(DataTableProxyService),
-			mockInstance(CollaborationService),
-		);
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 	});
 
 	describe('Queue Mode Detection', () => {
@@ -137,43 +104,7 @@ describe('McpService', () => {
 		});
 
 		it('should return true for isQueueMode when mode is queue', () => {
-<<<<<<< HEAD
 			const queueMcpService = createMcpService({ executionsMode: 'queue' });
-=======
-			// Create a new service with queue mode enabled
-			const queueExecutionsConfig = mockInstance(ExecutionsConfig, {
-				mode: 'queue',
-			});
-
-			const queueMcpService = new McpService(
-				mockLogger(),
-				queueExecutionsConfig,
-				instanceSettings,
-				mockInstance(WorkflowFinderService),
-				mockInstance(WorkflowService),
-				mockInstance(UrlService),
-				mockInstance(CredentialsService),
-				activeExecutions,
-				mockInstance(GlobalConfig, {
-					endpoints: { webhook: '/webhook', webhookTest: '/webhook-test' },
-				}),
-				mockInstance(Telemetry),
-				mockInstance(WorkflowRunner),
-				mockInstance(RoleService),
-				mockInstance(ProjectService),
-				mockInstance(WorkflowBuilderToolsService),
-				mockInstance(WorkflowCreationService),
-				mockInstance(NodeTypes),
-				mockInstance(ProjectRepository),
-				mockInstance(FolderRepository),
-				mockInstance(SharedWorkflowRepository),
-				mockInstance(ExecutionRepository),
-				mockInstance(ExecutionService),
-				mockInstance(DataTableProxyService),
-				mockInstance(CollaborationService),
-			);
-
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 			expect(queueMcpService.isQueueMode).toBe(true);
 		});
 	});
@@ -384,85 +315,15 @@ describe('McpService', () => {
 	describe('versioning', () => {
 		const user = Object.assign(new User(), { id: 'user-1' });
 
-<<<<<<< HEAD
 		it('creates the same version for the same tool set regardless of order', () => {
 			expect(createExternalMcpVersion('2.16.0', ['b', 'a'])).toBe(
 				createExternalMcpVersion('2.16.0', ['a', 'b']),
-=======
-			const service = new McpService(
-				mockLogger(),
-				executionsConfig,
-				instanceSettings,
-				mockInstance(WorkflowFinderService),
-				mockInstance(WorkflowService),
-				mockInstance(UrlService),
-				mockInstance(CredentialsService),
-				activeExecutions,
-				mockInstance(GlobalConfig, {
-					endpoints: {
-						webhook: '/webhook',
-						webhookTest: '/webhook-test',
-						mcpBuilderEnabled: false,
-					},
-				}),
-				mockInstance(Telemetry),
-				mockInstance(WorkflowRunner),
-				mockInstance(RoleService),
-				mockInstance(ProjectService),
-				workflowBuilderToolsService,
-				mockInstance(WorkflowCreationService),
-				mockInstance(NodeTypes),
-				mockInstance(ProjectRepository),
-				mockInstance(FolderRepository),
-				mockInstance(SharedWorkflowRepository),
-				mockInstance(ExecutionRepository),
-				mockInstance(ExecutionService),
-				mockInstance(DataTableProxyService),
-				mockInstance(CollaborationService),
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 			);
 		});
 
-<<<<<<< HEAD
 		it('creates different versions when the tool set changes', () => {
 			expect(createExternalMcpVersion('2.16.0', ['a', 'b'])).not.toBe(
 				createExternalMcpVersion('2.16.0', ['a', 'b', 'c']),
-=======
-		it('should register builder tools when mcpBuilderEnabled is true', async () => {
-			const user = Object.assign(new User(), { id: 'user-1' });
-			const workflowBuilderToolsService = mockInstance(WorkflowBuilderToolsService);
-
-			const service = new McpService(
-				mockLogger(),
-				executionsConfig,
-				instanceSettings,
-				mockInstance(WorkflowFinderService),
-				mockInstance(WorkflowService),
-				mockInstance(UrlService),
-				mockInstance(CredentialsService),
-				activeExecutions,
-				mockInstance(GlobalConfig, {
-					endpoints: {
-						webhook: '/webhook',
-						webhookTest: '/webhook-test',
-						mcpBuilderEnabled: true,
-					},
-				}),
-				mockInstance(Telemetry),
-				mockInstance(WorkflowRunner),
-				mockInstance(RoleService),
-				mockInstance(ProjectService),
-				workflowBuilderToolsService,
-				mockInstance(WorkflowCreationService),
-				mockInstance(NodeTypes),
-				mockInstance(ProjectRepository),
-				mockInstance(FolderRepository),
-				mockInstance(SharedWorkflowRepository),
-				mockInstance(ExecutionRepository),
-				mockInstance(ExecutionService),
-				mockInstance(DataTableProxyService),
-				mockInstance(CollaborationService),
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 			);
 		});
 

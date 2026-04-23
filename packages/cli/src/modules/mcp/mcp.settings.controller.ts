@@ -16,6 +16,7 @@ import { UpdateMcpSettingsDto } from './dto/update-mcp-settings.dto';
 import { UpdateWorkflowAvailabilityDto } from './dto/update-workflow-availability.dto';
 import { McpServerApiKeyService } from './mcp-api-key.service';
 import { McpSettingsService } from './mcp.settings.service';
+import { TenantMcpLinkService } from './tenant-mcp-link.service';
 
 import { NotFoundError } from '@/errors/response-errors/not-found.error';
 import { listQueryMiddleware } from '@/middlewares';
@@ -32,6 +33,7 @@ export class McpSettingsController {
 		private readonly mcpServerApiKeyService: McpServerApiKeyService,
 		private readonly workflowFinderService: WorkflowFinderService,
 		private readonly workflowService: WorkflowService,
+		private readonly tenantMcpLinkService: TenantMcpLinkService,
 	) {}
 
 	@GlobalScope('mcp:manage')
@@ -63,6 +65,26 @@ export class McpSettingsController {
 	@Post('/api-key/rotate')
 	async rotateApiKeyForMcpServer(req: AuthenticatedRequest) {
 		return await this.mcpServerApiKeyService.rotateMcpServerApiKey(req.user);
+	}
+
+	@Get('/tenants/:tenantId/link')
+	async getTenantMcpLink(req: AuthenticatedRequest, @Param('tenantId') tenantId: string) {
+		return await this.tenantMcpLinkService.getLinkMetadata(req.user, tenantId);
+	}
+
+	@Post('/tenants/:tenantId/link/rotate')
+	async rotateTenantMcpLink(req: AuthenticatedRequest, @Param('tenantId') tenantId: string) {
+		return await this.tenantMcpLinkService.rotateLink(req.user, tenantId);
+	}
+
+	@Get('/projects/:projectId/tenant-link')
+	async getProjectTenantMcpLink(req: AuthenticatedRequest, @Param('projectId') projectId: string) {
+		return await this.tenantMcpLinkService.getLinkMetadataForProject(req.user, projectId);
+	}
+
+	@Post('/projects/:projectId/tenant-link/rotate')
+	async rotateProjectTenantMcpLink(req: AuthenticatedRequest, @Param('projectId') projectId: string) {
+		return await this.tenantMcpLinkService.rotateLinkForProject(req.user, projectId);
 	}
 
 	@Get('/workflows', { middlewares: listQueryMiddleware })

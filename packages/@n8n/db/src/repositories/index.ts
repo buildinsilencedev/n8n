@@ -27,6 +27,8 @@ export { RoleMappingRuleRepository } from './role-mapping-rule.repository';
 export { ProcessedDataRepository } from './processed-data.repository';
 export { SettingsRepository } from './settings.repository';
 export { TagRepository } from './tag.repository';
+export { TenantRepository } from './tenant.repository';
+export { TenantMcpLinkRepository } from './tenant-mcp-link.repository';
 export { TestCaseExecutionRepository } from './test-case-execution.repository.ee';
 export { TestRunRepository } from './test-run.repository.ee';
 export { VariablesRepository } from './variables.repository';

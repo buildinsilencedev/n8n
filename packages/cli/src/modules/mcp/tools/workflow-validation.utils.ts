@@ -25,6 +25,7 @@ export type FoundWorkflow = NonNullable<
 
 export type GetMcpWorkflowOptions = {
 	includeActiveVersion?: boolean;
+	projectId?: string;
 };
 
 /**
@@ -62,6 +63,16 @@ export async function getMcpWorkflow(
 		throw new WorkflowAccessError(
 			'Workflow is not available in MCP. Enable MCP access in workflow settings.',
 			'not_available_in_mcp',
+		);
+	}
+
+	if (
+		options?.projectId &&
+		!workflow.shared?.some((sharedWorkflow) => sharedWorkflow.projectId === options.projectId)
+	) {
+		throw new WorkflowAccessError(
+			"Workflow not found or you don't have permission to access it.",
+			'no_permission',
 		);
 	}
 

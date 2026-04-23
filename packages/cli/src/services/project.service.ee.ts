@@ -31,6 +31,7 @@ import { UserError } from 'n8n-workflow';
 import { BadRequestError } from '@/errors/response-errors/bad-request.error';
 import { ForbiddenError } from '@/errors/response-errors/forbidden.error';
 import { NotFoundError } from '@/errors/response-errors/not-found.error';
+import { TenantMcpLinkService } from '@/modules/mcp/tenant-mcp-link.service';
 
 import { RoleService } from './role.service';
 
@@ -73,6 +74,7 @@ export class ProjectService {
 		private readonly sharedCredentialsRepository: SharedCredentialsRepository,
 		private readonly licenseState: LicenseState,
 		private readonly moduleRegistry: ModuleRegistry,
+		private readonly tenantMcpLinkService: TenantMcpLinkService,
 	) {}
 
 	private get workflowService() {
@@ -302,6 +304,12 @@ export class ProjectService {
 
 		// Link admin
 		await this.addUser(project.id, { userId: adminUser.id, role: 'project:admin' }, trx);
+		await this.tenantMcpLinkService.ensureTenantForProject(
+			project.id,
+			project.name,
+			adminUser.id,
+			trx,
+		);
 
 		return project;
 	}

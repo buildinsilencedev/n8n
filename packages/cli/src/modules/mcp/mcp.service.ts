@@ -30,7 +30,7 @@ import { createExecuteWorkflowTool } from './tools/execute-workflow.tool';
 import { createGetCredentialTypesTool } from './tools/get-credential-types.tool';
 import { createGetExecutionTool } from './tools/get-execution.tool';
 import { createWorkflowDetailsTool } from './tools/get-workflow-details.tool';
-import type { ToolDefinition } from './mcp.types';
+import type { McpRequestContext, ToolDefinition } from './mcp.types';
 import { createPrepareTestPinDataTool } from './tools/prepare-workflow-pin-data.tool';
 import { createPublishWorkflowTool } from './tools/publish-workflow.tool';
 import { createSearchCredentialsTool } from './tools/search-credentials.tool';
@@ -50,13 +50,12 @@ import { getSdkReferenceContent } from './tools/workflow-builder/sdk-reference-c
 import { createUpdateWorkflowTool } from './tools/workflow-builder/update-workflow.tool';
 import { createValidateWorkflowCodeTool } from './tools/workflow-builder/validate-workflow-code.tool';
 import { WorkflowBuilderToolsService } from './tools/workflow-builder/workflow-builder-tools.service';
+import { WorkflowAccessError } from './mcp.errors';
+import { getMcpWorkflow } from './tools/workflow-validation.utils';
 
 import { ActiveExecutions } from '@/active-executions';
-<<<<<<< HEAD
-import { N8N_VERSION } from '@/constants';
-=======
 import { CollaborationService } from '@/collaboration/collaboration.service';
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
+import { N8N_VERSION } from '@/constants';
 import { CredentialsService } from '@/credentials/credentials.service';
 import { ExecutionService } from '@/executions/execution.service';
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
@@ -85,9 +84,29 @@ type ExternalMcpToolRegistry = {
 	registerResources: (server: InstanceType<typeof McpServer>) => void;
 };
 
+type TenantMcpContextValue = NonNullable<McpRequestContext['tenantMcp']>;
+type ToolResultRecord = Record<string, unknown> & {
+	structuredContent?: unknown;
+	content?: unknown;
+	isError?: boolean;
+};
+
 const MCP_TOOLSET_HASH_LENGTH = 8;
 const MCP_PENDING_RESPONSE_TTL_MS = 15 * Time.minutes.toMilliseconds;
 const MCP_MAX_PENDING_RESPONSES = 500;
+const TENANT_PROJECT_ARG_TOOLS = new Set([
+	'search_workflows',
+	'search_credentials',
+	'search_folders',
+	'search_data_tables',
+	'create_data_table',
+	'rename_data_table',
+	'add_data_table_column',
+	'delete_data_table_column',
+	'rename_data_table_column',
+	'add_data_table_rows',
+	'create_workflow_from_code',
+]);
 
 export function createExternalMcpVersion(appVersion: string, toolNames: string[]): string {
 	const toolsetHash = createHash('sha256')
@@ -96,6 +115,24 @@ export function createExternalMcpVersion(appVersion: string, toolNames: string[]
 		.slice(0, MCP_TOOLSET_HASH_LENGTH);
 
 	return `${appVersion}-mcp.${toolsetHash}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function createProjectScopeError(message = 'Project is outside the tenant MCP scope.') {
+	return new WorkflowAccessError(message, 'no_permission');
+}
+
+function createToolError(error: Error) {
+	const output = { error: error.message };
+
+	return {
+		content: [{ type: 'text' as const, text: JSON.stringify(output) }],
+		structuredContent: output,
+		isError: true,
+	};
 }
 
 @Service()
@@ -133,10 +170,10 @@ export class McpService {
 		private readonly collaborationService: CollaborationService,
 	) {}
 
-	async getServer(user: User) {
+	async getServer(user: User, mcpContext?: McpRequestContext) {
 		const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
 		const builderEnabled = this.globalConfig.endpoints.mcpBuilderEnabled;
-		const externalToolRegistry = await this.getExternalToolRegistry(user);
+		const externalToolRegistry = await this.getExternalToolRegistry(user, mcpContext);
 		const server = new McpServer(
 			{
 				name: 'n8n MCP Server',
@@ -150,184 +187,18 @@ export class McpService {
 			},
 		);
 
-<<<<<<< HEAD
 		for (const tool of externalToolRegistry.tools) {
 			server.registerTool(tool.name, tool.config, tool.handler);
-=======
-		// Existing tools
-		const workflowSearchTool = createSearchWorkflowsTool(
-			user,
-			this.workflowService,
-			this.telemetry,
-		);
-		server.registerTool(
-			workflowSearchTool.name,
-			workflowSearchTool.config,
-			workflowSearchTool.handler,
-		);
-
-		const executeWorkflowTool = createExecuteWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowRunner,
-			this.telemetry,
-			this,
-		);
-		server.registerTool(
-			executeWorkflowTool.name,
-			executeWorkflowTool.config,
-			executeWorkflowTool.handler,
-		);
-
-		const getExecutionTool = createGetExecutionTool(
-			user,
-			this.executionRepository,
-			this.workflowFinderService,
-			this.telemetry,
-		);
-		server.registerTool(getExecutionTool.name, getExecutionTool.config, getExecutionTool.handler);
-
-		const workflowDetailsTool = createWorkflowDetailsTool(
-			user,
-			this.urlService.getWebhookBaseUrl(),
-			this.workflowFinderService,
-			this.credentialsService,
-			{
-				webhook: this.globalConfig.endpoints.webhook,
-				webhookTest: this.globalConfig.endpoints.webhookTest,
-			},
-			this.telemetry,
-			this.roleService,
-			this.projectService,
-		);
-		server.registerTool(
-			workflowDetailsTool.name,
-			workflowDetailsTool.config,
-			workflowDetailsTool.handler,
-		);
-
-		const publishWorkflowTool = createPublishWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowService,
-			this.telemetry,
-			this.collaborationService,
-		);
-		server.registerTool(
-			publishWorkflowTool.name,
-			publishWorkflowTool.config,
-			publishWorkflowTool.handler,
-		);
-
-		const unpublishWorkflowTool = createUnpublishWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowService,
-			this.telemetry,
-			this.collaborationService,
-		);
-		server.registerTool(
-			unpublishWorkflowTool.name,
-			unpublishWorkflowTool.config,
-			unpublishWorkflowTool.handler,
-		);
-
-		const prepareTestPinDataTool = createPrepareTestPinDataTool(
-			user,
-			this.workflowFinderService,
-			this.executionService,
-			this.nodeTypes,
-			this.telemetry,
-			this.logger,
-		);
-		server.registerTool(
-			prepareTestPinDataTool.name,
-			prepareTestPinDataTool.config,
-			prepareTestPinDataTool.handler,
-		);
-
-		const testWorkflowTool = createTestWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.activeExecutions,
-			this.workflowRunner,
-			this.nodeTypes,
-			this.telemetry,
-			this,
-		);
-		server.registerTool(testWorkflowTool.name, testWorkflowTool.config, testWorkflowTool.handler);
-
-		// Data table tools
-		const dataTableOps = this.dataTableProxyService.makeDataTableOperationsForUser(user);
-
-		const searchDataTablesTool = createSearchDataTablesTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			searchDataTablesTool.name,
-			searchDataTablesTool.config,
-			searchDataTablesTool.handler,
-		);
-
-		const createDataTableTool = createCreateDataTableTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			createDataTableTool.name,
-			createDataTableTool.config,
-			createDataTableTool.handler,
-		);
-
-		const renameDataTableTool = createRenameDataTableTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			renameDataTableTool.name,
-			renameDataTableTool.config,
-			renameDataTableTool.handler,
-		);
-
-		const addDataTableColumnTool = createAddDataTableColumnTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			addDataTableColumnTool.name,
-			addDataTableColumnTool.config,
-			addDataTableColumnTool.handler,
-		);
-
-		const deleteDataTableColumnTool = createDeleteDataTableColumnTool(
-			user,
-			dataTableOps,
-			this.telemetry,
-		);
-		server.registerTool(
-			deleteDataTableColumnTool.name,
-			deleteDataTableColumnTool.config,
-			deleteDataTableColumnTool.handler,
-		);
-
-		const renameDataTableColumnTool = createRenameDataTableColumnTool(
-			user,
-			dataTableOps,
-			this.telemetry,
-		);
-		server.registerTool(
-			renameDataTableColumnTool.name,
-			renameDataTableColumnTool.config,
-			renameDataTableColumnTool.handler,
-		);
-
-		const addDataTableRowsTool = createAddDataTableRowsTool(user, dataTableOps, this.telemetry);
-		server.registerTool(
-			addDataTableRowsTool.name,
-			addDataTableRowsTool.config,
-			addDataTableRowsTool.handler,
-		);
-
-		// Workflow builder tools (enabled via N8N_MCP_BUILDER_ENABLED)
-		if (builderEnabled) {
-			await this.registerBuilderTools(server, user);
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 		}
 		externalToolRegistry.registerResources(server);
 
 		return server;
 	}
 
-	async getExternalToolRegistry(user: User): Promise<ExternalMcpToolRegistry> {
+	async getExternalToolRegistry(
+		user: User,
+		mcpContext?: McpRequestContext,
+	): Promise<ExternalMcpToolRegistry> {
 		const tools: ToolDefinition[] = [];
 		const dataTableOps = this.dataTableProxyService.makeDataTableOperationsForUser(user);
 
@@ -366,12 +237,14 @@ export class McpService {
 				this.workflowFinderService,
 				this.workflowService,
 				this.telemetry,
+				this.collaborationService,
 			),
 			createUnpublishWorkflowTool(
 				user,
 				this.workflowFinderService,
 				this.workflowService,
 				this.telemetry,
+				this.collaborationService,
 			),
 			createPrepareTestPinDataTool(
 				user,
@@ -401,7 +274,7 @@ export class McpService {
 
 		if (!this.globalConfig.endpoints.mcpBuilderEnabled) {
 			return {
-				tools,
+				tools: this.applyTenantScopeToTools(user, tools, mcpContext),
 				registerResources: () => {},
 			};
 		}
@@ -416,6 +289,7 @@ export class McpService {
 			createCreateWorkflowFromCodeTool(
 				user,
 				this.workflowCreationService,
+				this.workflowFinderService,
 				this.urlService,
 				this.telemetry,
 				this.nodeTypes,
@@ -424,7 +298,13 @@ export class McpService {
 			),
 			createSearchProjectsTool(user, this.projectRepository, this.telemetry),
 			createSearchFoldersTool(user, this.folderRepository, this.projectService, this.telemetry),
-			createArchiveWorkflowTool(user, this.workflowService, this.telemetry),
+			createArchiveWorkflowTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.telemetry,
+				this.collaborationService,
+			),
 			createUpdateWorkflowTool(
 				user,
 				this.workflowFinderService,
@@ -434,92 +314,20 @@ export class McpService {
 				this.nodeTypes,
 				this.credentialsService,
 				this.sharedWorkflowRepository,
+				this.collaborationService,
 			),
 			createGetWorkflowSdkReferenceTool(user, this.telemetry),
 		);
 
-<<<<<<< HEAD
 		return {
-			tools,
+			tools: this.applyTenantScopeToTools(user, tools, mcpContext),
 			registerResources: (server: InstanceType<typeof McpServer>) => {
 				server.resource(
 					'workflow-sdk-reference',
 					'n8n://workflow-sdk/reference',
-=======
-		const validateTool = createValidateWorkflowCodeTool(user, this.telemetry);
-		server.registerTool(validateTool.name, validateTool.config, validateTool.handler);
-
-		const createTool = createCreateWorkflowFromCodeTool(
-			user,
-			this.workflowCreationService,
-			this.workflowFinderService,
-			this.urlService,
-			this.telemetry,
-			this.nodeTypes,
-			this.credentialsService,
-			this.projectRepository,
-		);
-		server.registerTool(createTool.name, createTool.config, createTool.handler);
-
-		const searchProjectsTool = createSearchProjectsTool(
-			user,
-			this.projectRepository,
-			this.telemetry,
-		);
-		server.registerTool(
-			searchProjectsTool.name,
-			searchProjectsTool.config,
-			searchProjectsTool.handler,
-		);
-
-		const searchFoldersTool = createSearchFoldersTool(
-			user,
-			this.folderRepository,
-			this.projectService,
-			this.telemetry,
-		);
-		server.registerTool(
-			searchFoldersTool.name,
-			searchFoldersTool.config,
-			searchFoldersTool.handler,
-		);
-
-		const archiveTool = createArchiveWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowService,
-			this.telemetry,
-			this.collaborationService,
-		);
-		server.registerTool(archiveTool.name, archiveTool.config, archiveTool.handler);
-
-		const updateTool = createUpdateWorkflowTool(
-			user,
-			this.workflowFinderService,
-			this.workflowService,
-			this.urlService,
-			this.telemetry,
-			this.nodeTypes,
-			this.credentialsService,
-			this.sharedWorkflowRepository,
-			this.collaborationService,
-		);
-		server.registerTool(updateTool.name, updateTool.config, updateTool.handler);
-
-		// SDK reference as MCP resource — for clients that support resources.
-		server.resource(
-			'workflow-sdk-reference',
-			'n8n://workflow-sdk/reference',
-			{
-				description:
-					'n8n Workflow SDK reference — patterns, expressions, and rules for building workflows. Get this FIRST before building workflows to learn the SDK.',
-			},
-			async () => ({
-				contents: [
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 					{
 						description:
-							'n8n Workflow SDK reference â€” patterns, expressions, and rules for building workflows. Get this FIRST before building workflows to learn the SDK.',
+							'n8n Workflow SDK reference - patterns, expressions, and rules for building workflows. Get this FIRST before building workflows to learn the SDK.',
 					},
 					async () => ({
 						contents: [
@@ -532,6 +340,142 @@ export class McpService {
 					}),
 				);
 			},
+		};
+	}
+
+	private applyTenantScopeToTools(
+		user: User,
+		tools: ToolDefinition[],
+		mcpContext?: McpRequestContext,
+	): ToolDefinition[] {
+		const tenantMcp = mcpContext?.tenantMcp;
+		if (!tenantMcp) {
+			return tools;
+		}
+
+		return tools.map((tool) => this.createTenantScopedTool(user, tool, tenantMcp));
+	}
+
+	private createTenantScopedTool(
+		user: User,
+		tool: ToolDefinition,
+		tenantMcp: TenantMcpContextValue,
+	): ToolDefinition {
+		return {
+			...tool,
+			handler: (async (rawArgs: unknown, extra: unknown) => {
+				try {
+					const scopedArgs = await this.getTenantScopedArgs(user, tool.name, rawArgs, tenantMcp);
+					const handler = tool.handler as (args: unknown, extra: unknown) => Promise<unknown>;
+					const result = await handler(scopedArgs, extra);
+
+					return this.scopeTenantToolResult(tool.name, result, tenantMcp);
+				} catch (error) {
+					if (error instanceof Error) {
+						return createToolError(error);
+					}
+
+					return createToolError(new Error(String(error)));
+				}
+			}) as ToolDefinition['handler'],
+		};
+	}
+
+	private async getTenantScopedArgs(
+		user: User,
+		toolName: string,
+		rawArgs: unknown,
+		tenantMcp: TenantMcpContextValue,
+	): Promise<unknown> {
+		if (!isRecord(rawArgs)) {
+			return rawArgs;
+		}
+
+		const scopedArgs = { ...rawArgs };
+		const projectId = scopedArgs.projectId;
+
+		if (typeof projectId === 'string' && projectId !== tenantMcp.projectId) {
+			throw createProjectScopeError();
+		}
+
+		if (
+			TENANT_PROJECT_ARG_TOOLS.has(toolName) &&
+			projectId === undefined &&
+			!(toolName === 'search_credentials' && typeof scopedArgs.workflowId === 'string')
+		) {
+			scopedArgs.projectId = tenantMcp.projectId;
+		}
+
+		if (toolName === 'search_workflows') {
+			scopedArgs.availableInMCP = true;
+		}
+
+		if (typeof scopedArgs.workflowId === 'string') {
+			await getMcpWorkflow(scopedArgs.workflowId, user, ['workflow:read'], this.workflowFinderService, {
+				projectId: tenantMcp.projectId,
+			});
+		}
+
+		return scopedArgs;
+	}
+
+	private scopeTenantToolResult(
+		toolName: string,
+		result: unknown,
+		tenantMcp: TenantMcpContextValue,
+	): unknown {
+		if (!isRecord(result)) {
+			return result;
+		}
+
+		const toolResult = result as ToolResultRecord;
+		if (!isRecord(toolResult.structuredContent)) {
+			return result;
+		}
+
+		if (toolName === 'search_workflows') {
+			const data = toolResult.structuredContent.data;
+			if (!Array.isArray(data)) {
+				return result;
+			}
+
+			const scopedData = data.filter(
+				(item) => isRecord(item) && item.availableInMCP === true,
+			);
+			return this.replaceStructuredToolResult(toolResult, {
+				...toolResult.structuredContent,
+				data: scopedData,
+				count: scopedData.length,
+			});
+		}
+
+		if (toolName === 'search_projects') {
+			const data = toolResult.structuredContent.data;
+			if (!Array.isArray(data)) {
+				return result;
+			}
+
+			const scopedData = data.filter(
+				(item) => isRecord(item) && item.id === tenantMcp.projectId,
+			);
+			return this.replaceStructuredToolResult(toolResult, {
+				...toolResult.structuredContent,
+				data: scopedData,
+				count: scopedData.length,
+			});
+		}
+
+		return result;
+	}
+
+	private replaceStructuredToolResult(
+		result: ToolResultRecord,
+		structuredContent: Record<string, unknown>,
+	) {
+		return {
+			...result,
+			structuredContent,
+			content: [{ type: 'text' as const, text: JSON.stringify(structuredContent) }],
 		};
 	}
 
