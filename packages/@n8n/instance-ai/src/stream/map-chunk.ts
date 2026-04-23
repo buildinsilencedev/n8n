@@ -12,6 +12,7 @@ import type {
 	PlannedTaskArg,
 	TaskList,
 	GatewayConfirmationRequiredPayload,
+	ExternalAuthLink,
 } from '@n8n/api-types';
 import { z } from 'zod';
 
@@ -20,6 +21,26 @@ const questionItemSchema = z.object({
 	question: z.string(),
 	type: z.enum(['single', 'multi', 'text']),
 	options: z.array(z.string()).optional(),
+});
+
+function isHttpsUrl(value: string): boolean {
+	try {
+		return new URL(value).protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
+
+const httpsUrlSchema = z.string().url().refine(isHttpsUrl, {
+	message: 'Expected HTTPS URL',
+});
+
+const externalAuthLinkPayloadSchema = z.object({
+	url: httpsUrlSchema,
+	host: z.string(),
+	provider: z.string().optional(),
+	expiresAt: z.string().optional(),
+	connectedAccountId: z.string().optional(),
 });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -197,6 +218,7 @@ export function mapMastraChunkToEvent(
 			'questions',
 			'plan-review',
 			'resource-decision',
+			'external-auth',
 		] as const;
 		const inputType = (validInputTypes as readonly string[]).includes(rawInputType ?? '')
 			? (rawInputType as (typeof validInputTypes)[number])
@@ -291,6 +313,15 @@ export function mapMastraChunkToEvent(
 			}
 		}
 
+		// Extract optional external auth link metadata (inputType=external-auth)
+		let authLink: ExternalAuthLink | undefined;
+		if (isRecord(suspendPayload.authLink)) {
+			const parsed = externalAuthLinkPayloadSchema.safeParse(suspendPayload.authLink);
+			if (parsed.success) {
+				authLink = parsed.data;
+			}
+		}
+
 		return {
 			type: 'confirmation-request',
 			...base,
@@ -316,6 +347,7 @@ export function mapMastraChunkToEvent(
 				...(tasks ? { tasks } : {}),
 				...(planItems ? { planItems } : {}),
 				...(resourceDecision ? { resourceDecision } : {}),
+				...(authLink ? { authLink } : {}),
 			},
 		};
 	}

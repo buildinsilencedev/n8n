@@ -9,6 +9,7 @@ import { useInstanceAiStore, type PendingConfirmationItem } from '../instanceAi.
 import { useToolLabel } from '../toolLabels';
 import ConfirmationFooter from './ConfirmationFooter.vue';
 import DomainAccessApproval from './DomainAccessApproval.vue';
+import ExternalAuthLink from './ExternalAuthLink.vue';
 import GatewayResourceDecision from './GatewayResourceDecision.vue';
 import InstanceAiCredentialSetup from './InstanceAiCredentialSetup.vue';
 import type { QuestionAnswer } from './InstanceAiQuestions.vue';
@@ -402,6 +403,19 @@ function isAllGenericApproval(items: PendingConfirmationItem[]): boolean {
 					:resource="chunk.item.toolCall.confirmation.resourceDecision.resource"
 					:description="chunk.item.toolCall.confirmation.resourceDecision.description"
 					:options="chunk.item.toolCall.confirmation.resourceDecision.options"
+				/>
+
+				<!-- External hosted auth link (Composio MCP and similar tools) -->
+				<ExternalAuthLink
+					v-else-if="
+						chunk.item.toolCall.confirmation.inputType === 'external-auth' &&
+						chunk.item.toolCall.confirmation.authLink
+					"
+					:key="'auth-' + chunk.item.toolCall.confirmation.requestId"
+					:class="$style.confirmation"
+					:request-id="chunk.item.toolCall.confirmation.requestId"
+					:auth-link="chunk.item.toolCall.confirmation.authLink"
+					:message="chunk.item.toolCall.confirmation.message"
 				/>
 			</template>
 

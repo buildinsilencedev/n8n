@@ -210,6 +210,58 @@ describe('InstanceAiConfirmationPanel telemetry', () => {
 		});
 	});
 
+	describe('external auth confirmation', () => {
+		it('renders a secure auth link and continues after authentication', async () => {
+			injectPendingConfirmation(store, {
+				requestId: 'req-auth',
+				severity: 'info',
+				message: 'Authenticate GitHub to continue.',
+				inputType: 'external-auth',
+				authLink: {
+					url: 'https://connect.composio.dev/link/ln_123',
+					host: 'connect.composio.dev',
+					provider: 'Composio',
+				},
+			});
+			const confirmSpy = vi.spyOn(store, 'confirmAction').mockResolvedValue(true);
+			const resolveSpy = vi.spyOn(store, 'resolveConfirmation');
+
+			const { getByTestId, getByText } = renderComponent();
+			const openLink = getByTestId('external-auth-open');
+
+			expect(getByText('instanceAi.externalAuth.prompt')).toBeInTheDocument();
+			expect(openLink).toHaveAttribute('href', 'https://connect.composio.dev/link/ln_123');
+			expect(openLink).toHaveAttribute('target', '_blank');
+			expect(openLink).toHaveAttribute('rel', 'noopener noreferrer');
+
+			await userEvent.click(getByTestId('external-auth-continue'));
+
+			expect(confirmSpy).toHaveBeenCalledWith('req-auth', true);
+			expect(resolveSpy).toHaveBeenCalledWith('req-auth', 'approved');
+		});
+
+		it('denies the confirmation when authentication is cancelled', async () => {
+			injectPendingConfirmation(store, {
+				requestId: 'req-auth',
+				severity: 'info',
+				message: 'Authenticate GitHub to continue.',
+				inputType: 'external-auth',
+				authLink: {
+					url: 'https://connect.composio.dev/link/ln_123',
+					host: 'connect.composio.dev',
+				},
+			});
+			const confirmSpy = vi.spyOn(store, 'confirmAction').mockResolvedValue(true);
+			const resolveSpy = vi.spyOn(store, 'resolveConfirmation');
+
+			const { getByTestId } = renderComponent();
+			await userEvent.click(getByTestId('external-auth-cancel'));
+
+			expect(confirmSpy).toHaveBeenCalledWith('req-auth', false);
+			expect(resolveSpy).toHaveBeenCalledWith('req-auth', 'denied');
+		});
+	});
+
 	describe('text input confirmation', () => {
 		it('tracks text submit with input_type and question', async () => {
 			injectPendingConfirmation(store, {

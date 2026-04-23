@@ -553,6 +553,45 @@ describe('agent-run-reducer', () => {
 				projectId: 'proj-456',
 			});
 		});
+
+		it('confirmation-request passes through external auth link data', () => {
+			const state = stateWithRun('run-1', 'root');
+			reduceEvent(state, makeToolCall('run-1', 'root', 'tc-1', 'composio-initiate'));
+			reduceEvent(state, {
+				type: 'confirmation-request',
+				runId: 'run-1',
+				agentId: 'root',
+				payload: {
+					requestId: 'req-auth',
+					toolCallId: 'tc-1',
+					toolName: 'composio-initiate',
+					args: {},
+					severity: 'info',
+					message: 'Authenticate GitHub',
+					inputType: 'external-auth',
+					authLink: {
+						url: 'https://connect.composio.dev/link/ln_123',
+						host: 'connect.composio.dev',
+						provider: 'Composio',
+						connectedAccountId: 'ca_123',
+					},
+				},
+			});
+
+			const tc = state.toolCallsById['tc-1'];
+			expect(tc.confirmation).toEqual({
+				requestId: 'req-auth',
+				severity: 'info',
+				message: 'Authenticate GitHub',
+				inputType: 'external-auth',
+				authLink: {
+					url: 'https://connect.composio.dev/link/ln_123',
+					host: 'connect.composio.dev',
+					provider: 'Composio',
+					connectedAccountId: 'ca_123',
+				},
+			});
+		});
 	});
 
 	describe('tasks-update', () => {

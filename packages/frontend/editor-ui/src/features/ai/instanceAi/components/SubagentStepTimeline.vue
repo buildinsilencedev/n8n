@@ -67,7 +67,6 @@ const toolCallsById = computed(() => {
 	return map;
 });
 
-<<<<<<< HEAD
 const swarmSummary = computed(() => {
 	const swarm = props.agentNode.swarm;
 	if (!swarm) {
@@ -106,9 +105,8 @@ const usageSummary = computed(() => {
 		},
 	});
 });
-=======
+
 const timelineEntries = computed(() => props.visibleEntries ?? props.agentNode.timeline);
->>>>>>> ff9d7d67561b4d668c0eeefbd9e3eb13de1610e5
 
 const steps = computed((): TimelineStep[] => {
 	const result: TimelineStep[] = [];

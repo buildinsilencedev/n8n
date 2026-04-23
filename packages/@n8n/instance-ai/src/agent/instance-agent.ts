@@ -6,6 +6,7 @@ import type { MastraCompositeStore } from '@mastra/core/storage';
 import { MCPClient } from '@mastra/mcp';
 import { nanoid } from 'nanoid';
 
+import { wrapMcpToolsForExternalAuth } from '../mcp/external-auth-link';
 import { createMemory } from '../memory/memory-config';
 import { createAllTools, createOrchestratorDomainTools, createOrchestrationTools } from '../tools';
 import { sanitizeMcpToolSchemas } from './sanitize-mcp-schemas';
@@ -72,7 +73,7 @@ async function getMcpTools(mcpServers: McpServerConfig[]): Promise<ToolsInput> {
 		id: `mcp-${nanoid(6)}`,
 		servers: buildMcpServers(mcpServers),
 	});
-	cachedMcpTools = sanitizeMcpToolSchemas(await mcpClient.listTools());
+	cachedMcpTools = wrapMcpToolsForExternalAuth(sanitizeMcpToolSchemas(await mcpClient.listTools()));
 	cachedMcpServersKey = key;
 	return cachedMcpTools;
 }
@@ -87,7 +88,9 @@ async function getBrowserMcpTools(config: McpServerConfig | undefined): Promise<
 		id: `browser-mcp-${nanoid(6)}`,
 		servers: buildMcpServers([config]),
 	});
-	cachedBrowserMcpTools = sanitizeMcpToolSchemas(await browserClient.listTools());
+	cachedBrowserMcpTools = wrapMcpToolsForExternalAuth(
+		sanitizeMcpToolSchemas(await browserClient.listTools()),
+	);
 	cachedBrowserMcpKey = key;
 	return cachedBrowserMcpTools;
 }

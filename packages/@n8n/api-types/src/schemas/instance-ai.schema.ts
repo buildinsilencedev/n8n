@@ -98,6 +98,27 @@ export const domainAccessMetaSchema = z.object({
 });
 export type DomainAccessMeta = z.infer<typeof domainAccessMetaSchema>;
 
+function isHttpsUrl(value: string): boolean {
+	try {
+		return new URL(value).protocol === 'https:';
+	} catch {
+		return false;
+	}
+}
+
+const httpsUrlSchema = z.string().url().refine(isHttpsUrl, {
+	message: 'Expected HTTPS URL',
+});
+
+export const externalAuthLinkSchema = z.object({
+	url: httpsUrlSchema,
+	host: z.string(),
+	provider: z.string().optional(),
+	expiresAt: z.string().optional(),
+	connectedAccountId: z.string().optional(),
+});
+export type ExternalAuthLink = z.infer<typeof externalAuthLinkSchema>;
+
 export const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function isSafeObjectKey(key: string): boolean {
@@ -337,12 +358,12 @@ export const confirmationRequestPayloadSchema = z.object({
 			'Target project ID — used to scope actions (e.g. credential creation) to the correct project',
 		),
 	inputType: z
-		.enum(['approval', 'text', 'questions', 'plan-review', 'resource-decision'])
+		.enum(['approval', 'text', 'questions', 'plan-review', 'resource-decision', 'external-auth'])
 		.optional()
 		.describe(
 			'UI mode: approval (default) shows approve/deny, text shows a text input, ' +
 				'questions shows structured Q&A wizard, plan-review shows plan approval with feedback, ' +
-				'resource-decision shows 5-option gateway permission dialog',
+				'resource-decision shows 5-option gateway permission dialog, external-auth shows a hosted auth link',
 		),
 	questions: z
 		.array(
@@ -379,6 +400,9 @@ export const confirmationRequestPayloadSchema = z.object({
 	resourceDecision: gatewayConfirmationRequiredPayloadSchema
 		.optional()
 		.describe('Gateway resource-access decision data (inputType=resource-decision)'),
+	authLink: externalAuthLinkSchema
+		.optional()
+		.describe('Hosted authentication link data (inputType=external-auth)'),
 });
 
 export const statusPayloadSchema = z.object({
@@ -655,7 +679,8 @@ export interface InstanceAiConfirmation {
 	message: string;
 	credentialRequests?: InstanceAiCredentialRequest[];
 	projectId?: string;
-	inputType?: 'approval' | 'text' | 'questions' | 'plan-review' | 'resource-decision';
+	inputType?: 'approval' | 'text' | 'questions' | 'plan-review' | 'resource-decision' | 'external-auth';
+	authLink?: ExternalAuthLink;
 	domainAccess?: DomainAccessMeta;
 	credentialFlow?: InstanceAiCredentialFlow;
 	setupRequests?: InstanceAiWorkflowSetupNode[];

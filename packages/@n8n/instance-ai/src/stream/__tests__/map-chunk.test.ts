@@ -554,7 +554,7 @@ describe('mapMastraChunkToEvent', () => {
 
 		// inputType
 
-		it.each(['approval', 'text', 'questions', 'plan-review'] as const)(
+		it.each(['approval', 'text', 'questions', 'plan-review', 'external-auth'] as const)(
 			'accepts valid inputType "%s"',
 			(inputType) => {
 				const chunk = {
@@ -570,6 +570,64 @@ describe('mapMastraChunkToEvent', () => {
 				}
 			},
 		);
+
+		it('includes external auth link metadata when present', () => {
+			const chunk = {
+				type: 'tool-call-suspended',
+				payload: {
+					toolCallId: 'tc-auth',
+					toolName: 'composio-auth',
+					suspendPayload: {
+						requestId: 'req-auth',
+						inputType: 'external-auth',
+						message: 'Authenticate GitHub',
+						authLink: {
+							url: 'https://connect.composio.dev/link/ln_123',
+							host: 'connect.composio.dev',
+							provider: 'Composio',
+							connectedAccountId: 'ca_123',
+						},
+					},
+				},
+			};
+
+			const result = mapMastraChunkToEvent(runId, agentId, chunk);
+			expect(result?.type).toBe('confirmation-request');
+			if (result?.type === 'confirmation-request') {
+				expect(result.payload.inputType).toBe('external-auth');
+				expect(result.payload.authLink).toEqual({
+					url: 'https://connect.composio.dev/link/ln_123',
+					host: 'connect.composio.dev',
+					provider: 'Composio',
+					connectedAccountId: 'ca_123',
+				});
+			}
+		});
+
+		it('omits external auth link metadata for non-HTTPS URLs', () => {
+			const chunk = {
+				type: 'tool-call-suspended',
+				payload: {
+					toolCallId: 'tc-auth',
+					toolName: 'composio-auth',
+					suspendPayload: {
+						requestId: 'req-auth',
+						inputType: 'external-auth',
+						message: 'Authenticate GitHub',
+						authLink: {
+							url: 'http://connect.composio.dev/link/ln_123',
+							host: 'connect.composio.dev',
+						},
+					},
+				},
+			};
+
+			const result = mapMastraChunkToEvent(runId, agentId, chunk);
+			expect(result?.type).toBe('confirmation-request');
+			if (result?.type === 'confirmation-request') {
+				expect(result.payload.authLink).toBeUndefined();
+			}
+		});
 
 		it('omits inputType for invalid value', () => {
 			const chunk = {
