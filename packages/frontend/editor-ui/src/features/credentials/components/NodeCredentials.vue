@@ -34,7 +34,6 @@ import {
 	getNodeCredentialForSelectedAuthType,
 	updateNodeAuthType,
 } from '@/app/utils/nodeTypesUtils';
-import { isEmpty } from '@/app/utils/typesUtils';
 import { getResourcePermissions } from '@n8n/permissions';
 import { useNodeCredentialOptions } from '../composables/useNodeCredentialOptions';
 import { useDynamicCredentials } from '@/features/resolvers/composables/useDynamicCredentials';
@@ -163,6 +162,10 @@ const hasWorkflowResolver = computed(() => {
 	return !!workflowDocumentStore?.value?.settings?.credentialResolverId;
 });
 
+const hasSelectedDisplayableCredential = computed(() =>
+	credentialTypesNodeDescriptionDisplayed.value.some(({ type }) => isCredentialExisting(type)),
+);
+
 function isCredentialResolvable(credentialType: string): boolean {
 	if (!isDynamicCredentialsEnabled.value) return false;
 	const credentialId = selected.value[credentialType]?.id;
@@ -211,7 +214,7 @@ watch(
 	credentialTypesNodeDescriptionDisplayed,
 	(types) => {
 		if (props.skipAutoSelect) return;
-		if (types.length === 0 || !isEmpty(selected.value)) return;
+		if (types.length === 0 || hasSelectedDisplayableCredential.value) return;
 
 		const allOptions = types.map((type) => type.options).flat();
 

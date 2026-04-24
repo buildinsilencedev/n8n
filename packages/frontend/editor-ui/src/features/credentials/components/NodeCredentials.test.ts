@@ -351,6 +351,63 @@ describe('NodeCredentials', () => {
 		expect(screen.queryByText('My Anthropic account')).toBeInTheDocument();
 	});
 
+	it('should auto-select a saved credential when the node only has a mismatched credentials object', () => {
+		const anthropicApiCredentialType: ICredentialType = {
+			name: 'anthropicApi',
+			displayName: 'Anthropic',
+			documentationUrl: 'anthropic',
+			properties: [
+				{ displayName: 'API Key', name: 'apiKey', type: 'string', required: true, default: '' },
+			],
+		};
+
+		const mismatchedNode: INodeUi = {
+			...httpNode,
+			parameters: {
+				...httpNode.parameters,
+				authentication: 'predefinedCredentialType',
+				nodeCredentialType: 'anthropicApi',
+			},
+			credentials: { httpHeaderAuth: { id: 'header-auth-id', name: 'Header Auth' } },
+		};
+
+		credentialsStore.state.credentialTypes = {
+			...credentialsStore.state.credentialTypes,
+			anthropicApi: anthropicApiCredentialType,
+		};
+		credentialsStore.state.credentials = {
+			'anthropic-cred-id': createCredential({
+				id: 'anthropic-cred-id',
+				name: 'My Anthropic account',
+				type: 'anthropicApi',
+				updatedAt: '2026-04-24T12:00:00.000Z',
+			}),
+		};
+
+		ndvStore.activeNode = mismatchedNode;
+
+		const { emitted } = renderComponent(
+			{
+				props: {
+					node: mismatchedNode,
+					overrideCredType: 'anthropicApi',
+				},
+			},
+			{ merge: true },
+		);
+
+		expect(emitted('credentialSelected')).toBeTruthy();
+		const payload = ((emitted('credentialSelected')[0] as unknown[]) ?? [])[0] as {
+			name: string;
+			properties: { credentials: Record<string, { id: string; name: string }> };
+		};
+		expect(payload.name).toBe(mismatchedNode.name);
+		expect(payload.properties.credentials.anthropicApi).toEqual({
+			id: 'anthropic-cred-id',
+			name: 'My Anthropic account',
+		});
+	});
+
 	it('should not ignored managed credentials in the dropdown if active node is not the HTTP node', async () => {
 		ndvStore.activeNode = openAiNode;
 		credentialsStore.state.credentials = {
