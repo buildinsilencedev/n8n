@@ -27,6 +27,16 @@ import { createRenameDataTableColumnTool } from './tools/data-table/rename-data-
 import { createRenameDataTableTool } from './tools/data-table/rename-data-table.tool';
 import { createSearchDataTablesTool } from './tools/data-table/search-data-tables.tool';
 import { createExecuteWorkflowTool } from './tools/execute-workflow.tool';
+import {
+	createAgentMemoryStoreTool,
+	createAgentMemoryRecallTool,
+	createAgentMemorySearchTool,
+	createAgentMemorySuggestFollowupTool,
+} from './tools/agent-memory.tool';
+import {
+	createListWorkflowToolsTool,
+	createCallWorkflowToolTool,
+} from './tools/workflow-tools.tool';
 import { createGetCredentialTypesTool } from './tools/get-credential-types.tool';
 import { createGetExecutionTool } from './tools/get-execution.tool';
 import { createWorkflowDetailsTool } from './tools/get-workflow-details.tool';
@@ -285,6 +295,19 @@ export class McpService {
 			createDeleteDataTableColumnTool(user, dataTableOps, this.telemetry),
 			createRenameDataTableColumnTool(user, dataTableOps, this.telemetry),
 			createAddDataTableRowsTool(user, dataTableOps, this.telemetry),
+			createAgentMemoryStoreTool(user, dataTableOps, this.telemetry),
+			createAgentMemoryRecallTool(user, dataTableOps, this.telemetry),
+			createAgentMemorySearchTool(user, dataTableOps, this.telemetry),
+			createAgentMemorySuggestFollowupTool(user, dataTableOps, this.telemetry),
+			createListWorkflowToolsTool(user, this.workflowService, this.telemetry),
+			createCallWorkflowToolTool(
+				user,
+				this.workflowService,
+				this.workflowFinderService,
+				this.workflowRunner,
+				this,
+				this.telemetry,
+			),
 		);
 
 		if (!this.globalConfig.endpoints.mcpBuilderEnabled) {
@@ -302,16 +325,76 @@ export class McpService {
 			createGetSuggestedWorkflowNodesTool(user, this.workflowBuilderToolsService, this.telemetry),
 			createValidateWorkflowCodeTool(user, this.telemetry),
 			createGetWorkflowAsSdkCodeTool(user, this.workflowFinderService, this.telemetry),
-			createVerifyWorkflowCredentialsTool(user, this.workflowFinderService, this.nodeTypes, this.telemetry),
-			createUpdateNodeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
-			createAddNodeMcpTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
-			createDeleteNodeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
-			createConnectNodesTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
-			createDisconnectNodesTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
-			createAddNormalizeAgentOutputNodeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
-			createPatchWorkflowSafeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
-			createSimulateTelegramMessageTool(user, this.workflowFinderService, this.activeExecutions, this.workflowRunner, this.nodeTypes, this.telemetry, this),
-			createSummarizeExecutionErrorTool(user, this.workflowFinderService, this.executionRepository, this.telemetry),
+			createVerifyWorkflowCredentialsTool(
+				user,
+				this.workflowFinderService,
+				this.nodeTypes,
+				this.telemetry,
+			),
+			createUpdateNodeTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.collaborationService,
+				this.telemetry,
+			),
+			createAddNodeMcpTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.collaborationService,
+				this.telemetry,
+			),
+			createDeleteNodeTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.collaborationService,
+				this.telemetry,
+			),
+			createConnectNodesTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.collaborationService,
+				this.telemetry,
+			),
+			createDisconnectNodesTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.collaborationService,
+				this.telemetry,
+			),
+			createAddNormalizeAgentOutputNodeTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.collaborationService,
+				this.telemetry,
+			),
+			createPatchWorkflowSafeTool(
+				user,
+				this.workflowFinderService,
+				this.workflowService,
+				this.collaborationService,
+				this.telemetry,
+			),
+			createSimulateTelegramMessageTool(
+				user,
+				this.workflowFinderService,
+				this.activeExecutions,
+				this.workflowRunner,
+				this.nodeTypes,
+				this.telemetry,
+				this,
+			),
+			createSummarizeExecutionErrorTool(
+				user,
+				this.workflowFinderService,
+				this.executionRepository,
+				this.telemetry,
+			),
 			createCreateWorkflowFromCodeTool(
 				user,
 				this.workflowCreationService,
@@ -437,9 +520,15 @@ export class McpService {
 		}
 
 		if (typeof scopedArgs.workflowId === 'string') {
-			await getMcpWorkflow(scopedArgs.workflowId, user, ['workflow:read'], this.workflowFinderService, {
-				projectId: tenantMcp.projectId,
-			});
+			await getMcpWorkflow(
+				scopedArgs.workflowId,
+				user,
+				['workflow:read'],
+				this.workflowFinderService,
+				{
+					projectId: tenantMcp.projectId,
+				},
+			);
 		}
 
 		return scopedArgs;
@@ -465,9 +554,7 @@ export class McpService {
 				return result;
 			}
 
-			const scopedData = data.filter(
-				(item) => isRecord(item) && item.availableInMCP === true,
-			);
+			const scopedData = data.filter((item) => isRecord(item) && item.availableInMCP === true);
 			return this.replaceStructuredToolResult(toolResult, {
 				...toolResult.structuredContent,
 				data: scopedData,
@@ -481,9 +568,7 @@ export class McpService {
 				return result;
 			}
 
-			const scopedData = data.filter(
-				(item) => isRecord(item) && item.id === tenantMcp.projectId,
-			);
+			const scopedData = data.filter((item) => isRecord(item) && item.id === tenantMcp.projectId);
 			return this.replaceStructuredToolResult(toolResult, {
 				...toolResult.structuredContent,
 				data: scopedData,
@@ -626,7 +711,10 @@ export class McpService {
 				executionId,
 				ageMs,
 			});
-			this.cancelPendingExecution(executionId, 'MCP execution timed out while awaiting worker response');
+			this.cancelPendingExecution(
+				executionId,
+				'MCP execution timed out while awaiting worker response',
+			);
 		}
 	}
 
