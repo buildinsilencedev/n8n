@@ -15,7 +15,6 @@ import { SettingsRepository, UserRepository } from '@n8n/db';
 import type { User } from '@n8n/db';
 import { Service } from '@n8n/di';
 import type { ModelConfig } from '@n8n/instance-ai';
-import type { IUserSettings } from 'n8n-workflow';
 import { jsonParse } from 'n8n-workflow';
 
 import { CredentialsFinderService } from '@/credentials/credentials-finder.service';
@@ -26,7 +25,7 @@ import { UserService } from '@/services/user.service';
 
 const ADMIN_SETTINGS_KEY = 'instanceAi.settings';
 
-type UserInstanceAiPreferences = NonNullable<IUserSettings['instanceAi']>;
+type UserInstanceAiPreferences = PersistedUserPreferences;
 
 /** Credential types we support and their Mastra provider mapping. */
 const CREDENTIAL_TO_MASTRA_PROVIDER: Record<string, string> = {
@@ -305,7 +304,7 @@ export class InstanceAiSettingsService {
 		maxEstimatedCostUsd: number | null;
 		maxPromptTokens: number | null;
 	}> {
-		const prefs = await this.loadUserPreferences(user.id);
+		const prefs = this.readUserPreferences(user);
 		return {
 			enabled: this.config.swarmEnabled,
 			mode: prefs.swarmMode ?? 'auto',
