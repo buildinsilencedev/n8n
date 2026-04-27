@@ -45,7 +45,22 @@ import { createGetSuggestedWorkflowNodesTool } from './tools/workflow-builder/ge
 import { createGetWorkflowNodeTypesTool } from './tools/workflow-builder/get-workflow-node-types.tool';
 import { createGetWorkflowSdkReferenceTool } from './tools/workflow-builder/get-workflow-sdk-reference.tool';
 import { getMcpInstructions } from './tools/workflow-builder/mcp-instructions';
+import {
+	createUpdateNodeTool,
+	createAddNodeMcpTool,
+	createDeleteNodeTool,
+	createConnectNodesTool,
+	createDisconnectNodesTool,
+	createAddNormalizeAgentOutputNodeTool,
+	createPatchWorkflowSafeTool,
+} from './tools/workflow-builder/patch-workflow-nodes.tool';
 import { createSearchWorkflowNodesTool } from './tools/workflow-builder/search-workflow-nodes.tool';
+import {
+	createGetWorkflowAsSdkCodeTool,
+	createVerifyWorkflowCredentialsTool,
+	createSimulateTelegramMessageTool,
+	createSummarizeExecutionErrorTool,
+} from './tools/workflow-builder/workflow-surgical-utils.tool';
 import { getSdkReferenceContent } from './tools/workflow-builder/sdk-reference-content';
 import { createUpdateWorkflowTool } from './tools/workflow-builder/update-workflow.tool';
 import { createValidateWorkflowCodeTool } from './tools/workflow-builder/validate-workflow-code.tool';
@@ -286,6 +301,17 @@ export class McpService {
 			createGetWorkflowNodeTypesTool(user, this.workflowBuilderToolsService, this.telemetry),
 			createGetSuggestedWorkflowNodesTool(user, this.workflowBuilderToolsService, this.telemetry),
 			createValidateWorkflowCodeTool(user, this.telemetry),
+			createGetWorkflowAsSdkCodeTool(user, this.workflowFinderService, this.telemetry),
+			createVerifyWorkflowCredentialsTool(user, this.workflowFinderService, this.nodeTypes, this.telemetry),
+			createUpdateNodeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
+			createAddNodeMcpTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
+			createDeleteNodeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
+			createConnectNodesTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
+			createDisconnectNodesTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
+			createAddNormalizeAgentOutputNodeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
+			createPatchWorkflowSafeTool(user, this.workflowFinderService, this.workflowService, this.collaborationService, this.telemetry),
+			createSimulateTelegramMessageTool(user, this.workflowFinderService, this.activeExecutions, this.workflowRunner, this.nodeTypes, this.telemetry, this),
+			createSummarizeExecutionErrorTool(user, this.workflowFinderService, this.executionRepository, this.telemetry),
 			createCreateWorkflowFromCodeTool(
 				user,
 				this.workflowCreationService,
