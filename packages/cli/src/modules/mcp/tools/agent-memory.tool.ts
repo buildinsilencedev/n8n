@@ -25,6 +25,7 @@ async function findMemoryTable(
 	dataTableOps: DataTableUserOperations,
 ): Promise<{ id: string; projectId: string } | null> {
 	const result = await dataTableOps.getManyAndCount({
+		skip: 0,
 		take: 5,
 		filter: { name: AGENT_MEMORY_TABLE_NAME },
 	});
