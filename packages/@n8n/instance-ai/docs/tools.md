@@ -199,6 +199,56 @@ are configured.
 
 Core count is 8; up to 4 more are conditionally registered based on license.
 
+### `workflow-control` (patch-first workflow edits)
+
+Command-style domain tool for safe, targeted workflow mutation without full
+workflow regeneration.
+
+Mutating commands always:
+1. Load current workflow via `getAsWorkflowJSON`
+2. Compute a compact diff
+3. Apply in one atomic `updateFromWorkflowJSON` call
+
+Diff shape returned by mutating commands:
+
+```json
+{
+  "nodesAdded": [],
+  "nodesRemoved": [],
+  "nodesUpdated": [],
+  "connectionsAdded": [],
+  "connectionsRemoved": []
+}
+```
+
+Supported commands:
+
+1. `updateNode(workflowId, nodeName, patch)`
+2. `addNode(workflowId, nodeSpec)`
+3. `deleteNode(workflowId, nodeName)`
+4. `connectNodes(workflowId, fromNode, toNode, outputIndex?, inputIndex?)`
+5. `disconnectNodes(workflowId, fromNode, toNode)`
+6. `verifyCredentials(workflowId)`
+7. `bindCredential(workflowId, nodeName, credentialId)`
+8. `simulateTelegramMessage(workflowId, chatId, text)`
+9. `addNormalizeAgentOutputNode(workflowId, afterNodeName)`
+10. `addIsolatedHealthCheckTrigger(workflowId)`
+
+Behavior notes:
+- Preserves existing node IDs and credentials by default; only targeted nodes
+  and connections are changed.
+- `verifyCredentials` lists every credential-requiring node and whether each
+  required credential is currently bound.
+- `bindCredential` validates credential-type compatibility before writing.
+- `simulateTelegramMessage` executes from the Telegram Trigger node with a
+  canonical Telegram update payload (`update_id`, `message.message_id`,
+  `message.chat.id`, `message.from`, `message.date`, `message.text`).
+- `addNormalizeAgentOutputNode` inserts a Code node directly after a node and
+  rewires main-path outputs through:
+  `return [{ json: $json.output || $json }];`
+- `addIsolatedHealthCheckTrigger` adds an isolated webhook -> health-output
+  branch that is not connected to Telegram/Gmail/Hunter/AI branches.
+
 ### `list-workflows`
 
 List workflows accessible to the current user.

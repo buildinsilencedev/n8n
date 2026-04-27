@@ -17,6 +17,7 @@ import { createResearchTool } from './research.tool';
 import { createAskUserTool } from './shared/ask-user.tool';
 import { createTaskControlTool } from './task-control.tool';
 import { createTemplatesTool } from './templates.tool';
+import { createWorkflowControlTool } from './workflow-control.tool';
 import { createApplyWorkflowCredentialsTool } from './workflows/apply-workflow-credentials.tool';
 import { createBuildWorkflowTool } from './workflows/build-workflow.tool';
 import { createWorkflowsTool } from './workflows.tool';
@@ -38,6 +39,7 @@ export function createAllTools(context: InstanceAiContext) {
 		templates: createTemplatesTool(),
 		'ask-user': createAskUserTool(),
 		'build-workflow': createBuildWorkflowTool(context),
+		'workflow-control': createWorkflowControlTool(context),
 		...(context.localMcpServer ? createToolsFromLocalMcpServer(context.localMcpServer) : {}),
 		...(context.currentUserAttachments?.some(isStructuredAttachment)
 			? { 'parse-file': createParseFileTool(context) }
@@ -60,6 +62,7 @@ export function createOrchestratorDomainTools(context: InstanceAiContext) {
 		nodes: createNodesTool(context, 'orchestrator'),
 		templates: createTemplatesTool(),
 		'ask-user': createAskUserTool(),
+		'workflow-control': createWorkflowControlTool(context),
 		...(context.localMcpServer ? createToolsFromLocalMcpServer(context.localMcpServer) : {}),
 	};
 }
