@@ -1,5 +1,6 @@
 import { isStructuredAttachment } from '../parsers/structured-file-parser';
 import type { InstanceAiContext, OrchestrationContext } from '../types';
+import { createAgentMemoryTool } from './agent-memory.tool';
 import { createParseFileTool } from './attachments/parse-file.tool';
 import { createCredentialsTool } from './credentials.tool';
 import { createDataTablesTool } from './data-tables.tool';
@@ -18,6 +19,7 @@ import { createAskUserTool } from './shared/ask-user.tool';
 import { createTaskControlTool } from './task-control.tool';
 import { createTemplatesTool } from './templates.tool';
 import { createWorkflowControlTool } from './workflow-control.tool';
+import { createWorkflowToolsTool } from './workflow-tools.tool';
 import { createApplyWorkflowCredentialsTool } from './workflows/apply-workflow-credentials.tool';
 import { createBuildWorkflowTool } from './workflows/build-workflow.tool';
 import { createWorkflowsTool } from './workflows.tool';
@@ -40,6 +42,8 @@ export function createAllTools(context: InstanceAiContext) {
 		'ask-user': createAskUserTool(),
 		'build-workflow': createBuildWorkflowTool(context),
 		'workflow-control': createWorkflowControlTool(context),
+		'agent-memory': createAgentMemoryTool(context),
+		'workflow-tools': createWorkflowToolsTool(context),
 		...(context.localMcpServer ? createToolsFromLocalMcpServer(context.localMcpServer) : {}),
 		...(context.currentUserAttachments?.some(isStructuredAttachment)
 			? { 'parse-file': createParseFileTool(context) }
@@ -63,6 +67,8 @@ export function createOrchestratorDomainTools(context: InstanceAiContext) {
 		templates: createTemplatesTool(),
 		'ask-user': createAskUserTool(),
 		'workflow-control': createWorkflowControlTool(context),
+		'agent-memory': createAgentMemoryTool(context),
+		'workflow-tools': createWorkflowToolsTool(context),
 		...(context.localMcpServer ? createToolsFromLocalMcpServer(context.localMcpServer) : {}),
 	};
 }
